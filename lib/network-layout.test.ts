@@ -46,3 +46,17 @@ test("reset viewport is neutral and isolated owner layouts do not depend on othe
       ownerPosition(3, 4, view, true),
     );
 });
+
+test("radial layouts give a large genealogy distinct positions beyond the original thirty-node budget", () => {
+  const positions = Array.from({ length: 90 }, (_, i) =>
+    cowPosition(i, 90, { x: 500, y: 340 }, 0, "radial", true),
+  );
+  assert.equal(
+    new Set(positions.map((p) => `${p.x.toFixed(3)},${p.y.toFixed(3)}`)).size,
+    90,
+  );
+  assert.ok(positions[89].tier > positions[29].tier);
+  assert.ok(
+    positions.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)),
+  );
+});

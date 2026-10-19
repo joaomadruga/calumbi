@@ -27,7 +27,8 @@ import {
   cowPosition,
   focusViewport,
 } from "@/lib/network-layout";
-import { makeCowNodes, cowStageLabel, cowAgeLabel } from "@/lib/cow-nodes";
+import { genealogyNodes, familyIds, genealogyLayout } from "@/lib/genealogy";
+import { cowStageLabel, cowAgeLabel } from "@/lib/cow-nodes";
 
 type Participant = { id: string; name: string; color: string; share: number };
 const palette = [
@@ -119,30 +120,50 @@ export default function HerdEvolution({
       (participantData?.[person.id] ?? []).map((row) => row.herd),
     ),
   );
-  const unit = useMemo(() => {
-    let scale = 1;
-    for (const cohorts of Object.values(cohortData ?? {}))
-      for (const person of participants) {
-        const nodes = makeCowNodes(
-          cohorts.filter((c) => c.owner === person.id),
-          adultMonths,
-        );
-        scale = Math.max(scale, nodes[0]?.unit ?? 1);
-      }
-    return scale;
-  }, [cohortData, participants, adultMonths]);
-  const cowGroups = Object.fromEntries(
+  const cowGroups = useMemo(
+    () =>
+      Object.fromEntries(
+        participants.map((person) => [
+          person.id,
+          genealogyNodes(
+            cohortData ?? {},
+            snapshot?.year ?? 0,
+            person.id,
+            adultMonths,
+          ),
+        ]),
+      ),
+    [cohortData, snapshot?.year, participants, adultMonths],
+  );
+  const visibleFamily = familyIds(
+    Object.values(cowGroups).flat(),
+    selectedSource,
+  );
+  const treeLayouts = Object.fromEntries(
     participants.map((person) => [
       person.id,
-      makeCowNodes(
-        (cohortData?.[snapshot?.year ?? 0] ?? []).filter(
-          (c) => c.owner === person.id,
+      genealogyLayout(
+        (cowGroups[person.id] ?? []).filter((n) =>
+          visibleFamily.has(n.sourceIds[0]),
         ),
-        adultMonths,
-        unit,
       ),
     ]),
   );
+  const branchWidths = Object.fromEntries(
+    participants.map((person) => {
+      const xs = [...treeLayouts[person.id].values()].map((p) => p.x);
+      return [
+        person.id,
+        xs.length ? Math.max(...xs) - Math.min(...xs) + 150 : 150,
+      ];
+    }),
+  );
+  const visiblePeople = participants.filter(
+    (p) => !focusedOwner || p.id === focusedOwner,
+  );
+  let treeCursor =
+    500 -
+    visiblePeople.reduce((sum, p) => sum + branchWidths[p.id] + 100, -100) / 2;
   const selectedCow = selectedSource
     ? Object.values(cowGroups)
         .flat()
@@ -176,7 +197,13 @@ export default function HerdEvolution({
       view,
       focusedOwner === person.id,
     );
-    const animalNodes = cowGroups[person.id] ?? [];
+    if (view === "top-down" && (!focusedOwner || focusedOwner === person.id)) {
+      branch.x = treeCursor + branchWidths[person.id] / 2;
+      treeCursor += branchWidths[person.id] + 100;
+    }
+    const animalNodes = (cowGroups[person.id] ?? []).filter((n) =>
+      visibleFamily.has(n.sourceIds[0]),
+    );
     const leaves = animalNodes.map((animal, n) => ({
       ...cowPosition(
         n,
@@ -186,6 +213,18 @@ export default function HerdEvolution({
         view,
         focusedOwner === person.id,
       ),
+      ...(view === "top-down"
+        ? {
+            x:
+              branch.x +
+              (treeLayouts[person.id].get(animal.sourceIds[0])?.x ?? 0),
+            y:
+              branch.y +
+              135 +
+              (treeLayouts[person.id].get(animal.sourceIds[0])?.y ?? 0),
+            tier: treeLayouts[person.id].get(animal.sourceIds[0])?.tier ?? 0,
+          }
+        : {}),
       animal,
     }));
     return {
@@ -201,27 +240,14 @@ export default function HerdEvolution({
   const focusedBranch = branches.find(
     (branch) => branch.person.id === focusedOwner,
   );
-  const focusedLeaf = selectedSource
-    ? focusedBranch?.leaves.find(
-        (leaf) =>
-          leaf.animal.sourceIds.includes(selectedSource) &&
-          Number(leaf.animal.id.split(":").at(-1)) === selectedPart,
-      )
-    : undefined;
-  const cameraPoints = selectedSource
-    ? focusedLeaf
-      ? [focusedLeaf]
-      : []
-    : focusedBranch
-      ? [focusedBranch.branch, ...focusedBranch.leaves]
-      : [];
-  const camera = focusViewport(cameraPoints, selectedSource ? 2.5 : 1.8);
+  const cameraPoints = focusedBranch
+    ? [focusedBranch.branch, ...focusedBranch.leaves]
+    : [
+        ...branches.flatMap((b) => [b.branch, ...b.leaves]),
+        { x: 500, y: view === "top-down" ? 85 : 340 },
+      ];
+  const camera = focusViewport(cameraPoints, focusedOwner ? 1.8 : 1);
   useEffect(() => {
-    if (!focusedOwner) {
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
-      return;
-    }
     setZoom(camera.zoom);
     setPan(camera.pan);
   }, [
@@ -280,14 +306,22 @@ export default function HerdEvolution({
     )
       return;
     const ratio = Math.min(rect.width / 1000, rect.height / 680);
+    const limitX = Math.max(
+      1000,
+      ...cameraPoints.map((p) => Math.abs(p.x - 500) * zoom + 500),
+    );
+    const limitY = Math.max(
+      680,
+      ...cameraPoints.map((p) => Math.abs(p.y - 340) * zoom + 340),
+    );
     setPan({
       x: Math.max(
-        -1000,
-        Math.min(1000, initial.panX + (event.clientX - initial.x) / ratio),
+        -limitX,
+        Math.min(limitX, initial.panX + (event.clientX - initial.x) / ratio),
       ),
       y: Math.max(
-        -680,
-        Math.min(680, initial.panY + (event.clientY - initial.y) / ratio),
+        -limitY,
+        Math.min(limitY, initial.panY + (event.clientY - initial.y) / ratio),
       ),
     });
   };
@@ -304,12 +338,12 @@ export default function HerdEvolution({
           </span>
           <h2>
             {ownerName
-              ? `A rede de ${ownerName.split(" ")[0]}.`
-              : "O futuro da Calumbi, conectado."}
+              ? `A família de ${ownerName.split(" ")[0]}.`
+              : "A árvore das próximas gerações."}
           </h2>
           <p>
-            Explore os ramos de cada integrante e veja o rebanho ganhar novos
-            nós ao longo dos anos.
+            Mães acima, crias abaixo. Acompanhe as famílias e o ano de
+            nascimento de cada geração.
           </p>
         </div>
         <button
@@ -342,9 +376,44 @@ export default function HerdEvolution({
             aria-pressed={view === "top-down"}
             onClick={() => setView("top-down")}
           >
-            <GitFork size={14} /> De cima para baixo
+            <GitFork size={14} /> Árvore genealógica
           </button>
         </div>
+        <select
+          aria-label="Filtrar família pela matriz"
+          value={selectedSource ?? ""}
+          onChange={(e) => {
+            const source = e.target.value;
+            setSelectedSource(source || null);
+            setSelectedPart(0);
+            const mother = Object.values(cowGroups)
+              .flat()
+              .find((n) => n.sourceIds[0] === source);
+            if (mother) setFocusedOwner(mother.owner);
+            setFocusRevision((v) => v + 1);
+          }}
+        >
+          <option value="">Todas as famílias</option>
+          {Object.values(cowGroups)
+            .flat()
+            .filter(
+              (n) =>
+                n.sex === "F" &&
+                !n.motherId &&
+                (!focusedOwner || n.owner === focusedOwner),
+            )
+            .map((n) => (
+              <option key={n.id} value={n.sourceIds[0]}>
+                {participants.find((p) => p.id === n.owner)?.name} · {n.label} ·{" "}
+                {n.birthYear}
+              </option>
+            ))}
+          {selectedCow && (selectedCow.motherId || selectedCow.sex === "M") && (
+            <option value={selectedSource!}>
+              {selectedCow.label} · {selectedCow.birthYear}
+            </option>
+          )}
+        </select>
         {focusedOwner ? (
           <div className="network-focus-breadcrumb">
             <button
@@ -420,118 +489,134 @@ export default function HerdEvolution({
                         className="radial-trunk"
                       />
                     )}
-                    {leaves
-                      .filter(
-                        (leaf) =>
-                          !selectedSource || leaf.animal.id === selectedCow?.id,
-                      )
-                      .map((leaf, n) => {
-                        const parents = leaves.filter(
-                          (candidate) => candidate.tier === leaf.tier - 1,
-                        );
-                        const parent =
-                          leaf.tier === 0
-                            ? branch
-                            : parents.reduce(
-                                (best, candidate) =>
-                                  Math.hypot(
-                                    candidate.x - leaf.x,
-                                    candidate.y - leaf.y,
-                                  ) <
-                                  Math.hypot(best.x - leaf.x, best.y - leaf.y)
-                                    ? candidate
-                                    : best,
-                                parents[0] ?? branch,
+                    {leaves.map((leaf, n) => {
+                      const mother = leaves.find((candidate) =>
+                        candidate.animal.sourceIds.includes(
+                          leaf.animal.motherId ?? "",
+                        ),
+                      );
+                      const parent = mother ?? branch;
+                      return (
+                        <g key={leaf.animal.id}>
+                          <path
+                            d={
+                              view === "top-down"
+                                ? `M${parent.x},${parent.y + (mother ? 58 : 95)} V${(parent.y + (mother ? 58 : 95) + leaf.y - 19) / 2} H${leaf.x} V${leaf.y - 19}`
+                                : `M${parent.x},${parent.y} L${leaf.x},${leaf.y}`
+                            }
+                            className={
+                              mother
+                                ? "genealogy-mother-link"
+                                : "genealogy-owner-link"
+                            }
+                          >
+                            <title>
+                              {mother
+                                ? `${mother.animal.label} → ${leaf.animal.label} · nascimento ${leaf.animal.birthYear} (projeção)`
+                                : "Vínculo com o participante; mãe não informada"}
+                            </title>
+                          </path>
+                          <g
+                            transform={`translate(${leaf.x} ${leaf.y})`}
+                            data-network-node="true"
+                            className={`radial-cow-node ${leaf.animal.historical ? "genealogy-historical" : ""} ${selectedCow?.id === leaf.animal.id ? "is-chosen" : ""}`}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`${leaf.animal.label}, nascimento ${leaf.animal.birthYear}, mãe ${mother?.animal.label ?? "não informada"}, ${leaf.animal.historical ? "somente ancestral histórico, fora do rebanho, " : ""}${cowStageLabel(leaf.animal.stage, leaf.animal.sex)}, ${cowAgeLabel(leaf.animal.minAge, leaf.animal.maxAge)}, ${decimal(leaf.animal.count)} cabeças de ${person.name}`}
+                            onClick={() => {
+                              setSelectedSource(leaf.animal.sourceIds[0]);
+                              setSelectedPart(
+                                Number(leaf.animal.id.split(":").at(-1)),
                               );
-                        return (
-                          <g key={leaf.animal.id}>
-                            {!selectedSource && (
-                              <line
-                                x1={view === "top-down" ? branch.x : parent.x}
-                                y1={view === "top-down" ? branch.y : parent.y}
-                                x2={leaf.x}
-                                y2={leaf.y}
-                                className="radial-twig"
-                              />
-                            )}
-                            <g
-                              transform={`translate(${leaf.x} ${leaf.y})`}
-                              data-network-node="true"
-                              className={`radial-cow-node ${selectedCow?.id === leaf.animal.id ? "is-chosen" : ""}`}
-                              role="button"
-                              tabIndex={0}
-                              aria-label={`${cowStageLabel(leaf.animal.stage, leaf.animal.sex)}, ${cowAgeLabel(leaf.animal.minAge, leaf.animal.maxAge)}, ${decimal(leaf.animal.count)} cabeças de ${person.name}`}
-                              onClick={() => {
+                              setFocusedOwner(person.id);
+                              setFocusRevision((value) => value + 1);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
                                 setSelectedSource(leaf.animal.sourceIds[0]);
                                 setSelectedPart(
                                   Number(leaf.animal.id.split(":").at(-1)),
                                 );
                                 setFocusedOwner(person.id);
                                 setFocusRevision((value) => value + 1);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  setSelectedSource(leaf.animal.sourceIds[0]);
-                                  setSelectedPart(
-                                    Number(leaf.animal.id.split(":").at(-1)),
-                                  );
-                                  setFocusedOwner(person.id);
-                                  setFocusRevision((value) => value + 1);
-                                }
-                              }}
+                              }
+                            }}
+                          >
+                            <ellipse
+                              className="radial-cow-focus"
+                              cy="1"
+                              rx="21"
+                              ry="24"
+                            />
+                            <g
+                              className="radial-cow-float"
+                              style={{ animationDelay: `${n * 0.13}s` }}
                             >
-                              <ellipse
-                                className="radial-cow-focus"
-                                cy="1"
-                                rx="21"
-                                ry="24"
-                              />
                               <g
-                                className="radial-cow-float"
-                                style={{ animationDelay: `${n * 0.13}s` }}
+                                transform={`translate(${-28 * (leaf.animal.stage === "newborn" ? 0.45 : leaf.animal.stage === "young" ? 0.53 : 0.6)} ${-20 * (leaf.animal.stage === "newborn" ? 0.45 : leaf.animal.stage === "young" ? 0.53 : 0.6)}) scale(${leaf.animal.stage === "newborn" ? 0.45 : leaf.animal.stage === "young" ? 0.53 : 0.6})`}
                               >
-                                <g
-                                  transform={`translate(${-28 * (leaf.animal.stage === "newborn" ? 0.45 : leaf.animal.stage === "young" ? 0.53 : 0.6)} ${-20 * (leaf.animal.stage === "newborn" ? 0.45 : leaf.animal.stage === "young" ? 0.53 : 0.6)}) scale(${leaf.animal.stage === "newborn" ? 0.45 : leaf.animal.stage === "young" ? 0.53 : 0.6})`}
-                                >
-                                  <CowGlyph
-                                    stage={leaf.animal.stage}
-                                    color={color}
-                                  />
-                                </g>
+                                <CowGlyph
+                                  stage={leaf.animal.stage}
+                                  color={color}
+                                />
                               </g>
-                              <text
-                                className={`radial-cow-age ${leaf.animal.stage}`}
-                                y="22"
-                                textAnchor="middle"
-                              >
-                                {leaf.animal.stage === "newborn"
-                                  ? "Bebê"
-                                  : leaf.animal.minAge === leaf.animal.maxAge
-                                    ? `${Math.floor(leaf.animal.minAge / 12)}a`
-                                    : `${Math.floor(leaf.animal.minAge / 12)}–${Math.floor(leaf.animal.maxAge / 12)}a`}
-                              </text>
-                              <title>
-                                {person.name} ·{" "}
-                                {cowStageLabel(
-                                  leaf.animal.stage,
-                                  leaf.animal.sex,
-                                )}{" "}
-                                ·{" "}
-                                {cowAgeLabel(
-                                  leaf.animal.minAge,
-                                  leaf.animal.maxAge,
-                                )}{" "}
-                                · {decimal(leaf.animal.count)} cabeças.{" "}
-                                {leaf.animal.birthYear
-                                  ? `Nascidas em ${leaf.animal.birthYear}.`
-                                  : ""}
-                              </title>
                             </g>
+                            <text
+                              className="genealogy-cow-name"
+                              y="24"
+                              textAnchor="middle"
+                            >
+                              {leaf.animal.label.length > 18
+                                ? `${leaf.animal.label.slice(0, 17)}…`
+                                : leaf.animal.label}
+                            </text>
+                            <text
+                              className="genealogy-birth-year"
+                              y="39"
+                              textAnchor="middle"
+                            >
+                              {leaf.animal.historical
+                                ? "Ancestral · "
+                                : leaf.animal.projected
+                                  ? "Prev. "
+                                  : leaf.animal.birthEstimated
+                                    ? "Nasc. ≈ "
+                                    : "Nasc. "}
+                              {leaf.animal.birthYear}
+                            </text>
+                            <text
+                              className={`radial-cow-age ${leaf.animal.stage}`}
+                              y="53"
+                              textAnchor="middle"
+                            >
+                              {leaf.animal.historical
+                                ? "Fora do rebanho"
+                                : cowAgeLabel(leaf.animal.minAge)}
+                            </text>
+                            <title>
+                              {leaf.animal.label} · mãe:{" "}
+                              {mother?.animal.label ?? "não informada"} ·{" "}
+                              {person.name} ·{" "}
+                              {cowStageLabel(
+                                leaf.animal.stage,
+                                leaf.animal.sex,
+                              )}{" "}
+                              ·{" "}
+                              {cowAgeLabel(
+                                leaf.animal.minAge,
+                                leaf.animal.maxAge,
+                              )}{" "}
+                              · {decimal(leaf.animal.count)} cabeças.{" "}
+                              {leaf.animal.birthYear
+                                ? `Nascidas em ${leaf.animal.birthYear}.`
+                                : ""}
+                            </title>
                           </g>
-                        );
-                      })}
-                    {!selectedSource && (
+                        </g>
+                      );
+                    })}
+                    {
                       <g
                         transform={`translate(${branch.x} ${branch.y})`}
                         className={`radial-owner ${focusedOwner === person.id ? "is-focused" : ""}`}
@@ -576,7 +661,7 @@ export default function HerdEvolution({
                           {decimal(count)} cabeças
                         </text>
                       </g>
-                    )}
+                    }
                   </g>
                 );
               })}
@@ -639,21 +724,20 @@ export default function HerdEvolution({
         )}
         <div className="radial-canvas-bottom">
           <span>
-            <TinyCow /> Cada vaquinha representa até {decimal(unit)}{" "}
-            {unit === 1 ? "animal" : "animais"}
+            <TinyCow /> Linhas contínuas: mãe → cria · tracejadas: participante
           </span>
           <div className="radial-zoom">
             <button
               aria-label="Diminuir zoom do grafo"
-              disabled={zoom <= 0.7}
-              onClick={() => setZoom(Math.max(0.7, zoom - 0.2))}
+              disabled={zoom <= 0.01}
+              onClick={() => setZoom(Math.max(0.01, zoom / 1.25))}
             >
               <Minus size={15} />
             </button>
             <button
               aria-label="Aumentar zoom do grafo"
               disabled={zoom >= 2.5}
-              onClick={() => setZoom(Math.min(2.5, zoom + 0.2))}
+              onClick={() => setZoom(Math.min(2.5, zoom * 1.25))}
             >
               <Plus size={15} />
             </button>
@@ -662,13 +746,8 @@ export default function HerdEvolution({
                 focusedOwner ? "Enquadrar seleção" : "Enquadrar todo o grafo"
               }
               onClick={() => {
-                if (focusedOwner) {
-                  setZoom(camera.zoom);
-                  setPan(camera.pan);
-                } else {
-                  setZoom(1);
-                  setPan({ x: 0, y: 0 });
-                }
+                setZoom(camera.zoom);
+                setPan(camera.pan);
               }}
             >
               <Maximize2 size={15} />
@@ -688,7 +767,7 @@ export default function HerdEvolution({
         <span>
           <i className="adult" /> Adulta · {Math.max(12, adultMonths)}+ meses
         </span>
-        <small>Clique numa vaquinha para ver a idade.</small>
+        <small>Clique numa vaquinha para aproximar sua família.</small>
       </div>
       <div className="radial-time-control">
         <button
@@ -759,7 +838,10 @@ export default function HerdEvolution({
       {selectedCow && (
         <div className="cow-age-inspector" aria-live="polite">
           <div>
-            <strong>{cowStageLabel(selectedCow.stage, selectedCow.sex)}</strong>
+            <strong>
+              {selectedCow.label} ·{" "}
+              {cowStageLabel(selectedCow.stage, selectedCow.sex)}
+            </strong>
             <span>
               {cowAgeLabel(selectedCow.minAge, selectedCow.maxAge)} em{" "}
               {snapshot.year}
@@ -768,10 +850,20 @@ export default function HerdEvolution({
                 : ""}
             </span>
           </div>
-          <span>{decimal(selectedCow.count)} cabeças representadas</span>
+          <span>
+            {selectedCow.historical
+              ? "Ancestral fora do rebanho atual"
+              : `${decimal(selectedCow.count)} cabeças esperadas`}
+          </span>
           <p>
-            Ao avançar um ano, a idade aumenta 12 meses. Animais vendidos,
-            descartados ou sem sobrevivência projetada deixam a rede.
+            Mãe:{" "}
+            {Object.values(cowGroups)
+              .flat()
+              .find((n) => n.sourceIds.includes(selectedCow.motherId ?? ""))
+              ?.label ?? "não informada"}
+            . O ramo mostra as ancestrais e descendentes projetadas. Ancestrais
+            fora do rebanho aparecem apagadas para preservar o parentesco, sem
+            entrar nas contagens.
           </p>
         </div>
       )}
@@ -857,10 +949,12 @@ export default function HerdEvolution({
         )}
       </div>
       <div className="chart-footnote">
-        Núcleo: rebanho total. Ramos: integrantes. Nós menores: grupos de
-        animais projetados, sem representar parentesco real. A rede muda com os
-        nascimentos, mortes e vendas. Capacidade compartilhada: {capacity}{" "}
-        cabeças. Custos e aportes são rateados pelo rebanho médio de cada ano.
+        Árvore materna projetada: cada cria fica ligada à mãe usada na
+        simulação. Para os animais já cadastrados, a mãe não foi informada e
+        nenhum parentesco é inventado. Valores fracionários são expectativas de
+        nascimento e sobrevivência. Ancestrais apagadas não fazem parte do
+        rebanho atual. Capacidade compartilhada: {capacity} cabeças. Custos e
+        aportes são rateados pelo rebanho médio de cada ano.
       </div>
     </section>
   );

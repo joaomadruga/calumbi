@@ -35,17 +35,27 @@ export function cowPosition(
       tier: row,
     };
   }
-  const tier = index < 6 ? 0 : index < 16 ? 1 : 2,
-    offset = tier === 0 ? 0 : tier === 1 ? 6 : 16;
+  const tier =
+      index < 6
+        ? 0
+        : index < 16
+          ? 1
+          : index < 30
+            ? 2
+            : 3 + Math.floor((index - 30) / 20),
+    offset =
+      tier === 0 ? 0 : tier === 1 ? 6 : tier === 2 ? 16 : 30 + (tier - 3) * 20;
   const inTier = Math.min(
-    tier === 0 ? 6 : tier === 1 ? 10 : 14,
+    tier === 0 ? 6 : tier === 1 ? 10 : tier === 2 ? 14 : 20,
     total - offset,
   );
   const a = focused
     ? -Math.PI / 2 + ((index - offset) * Math.PI * 2) / Math.max(1, inTier)
     : angle +
       (inTier === 1 ? 0 : ((index - offset) / (inTier - 1) - 0.5) * 2.45);
-  const radius = [80, 122, 156][tier] + Math.sin(index * 2.4) * 3;
+  const radius =
+    (tier < 3 ? [80, 122, 156][tier] : 206 + (tier - 3) * 55) +
+    Math.sin(index * 2.4) * 3;
   return {
     x: branch.x + Math.cos(a) * radius,
     y: branch.y + Math.sin(a) * radius,

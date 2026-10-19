@@ -4573,3 +4573,44 @@ dd {
     font-size: 16px;
   }
 }
+
+/* Árvore materna: as ligações seguem o parentesco da simulação. */
+.genealogy-mother-link {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  opacity: 0.65;
+  animation: radial-link-in 0.6s ease both;
+}
+.genealogy-owner-link {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-dasharray: 4 5;
+  opacity: 0.3;
+}
+.genealogy-cow-name {
+  fill: #555568;
+  font: 600 9px var(--font);
+}
+.genealogy-birth-year {
+  fill: #77758b;
+  font: 500 9px var(--font);
+}
+.genealogy-historical .radial-cow-float {
+  opacity: 0.35;
+}
+.genealogy-historical .genealogy-cow-name {
+  fill: #92909e;
+}
+.network-view-toolbar > select {
+  max-width: 320px;
+  min-width: 0;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .network-view-toolbar > select {
+    width: 100%;
+    max-width: none;
+  }
+}

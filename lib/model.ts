@@ -148,10 +148,12 @@ export type Projection = {
 };
 export type ProjectedCohort = {
   id: string;
+  motherId?: string;
   owner: string;
   sex: "F" | "M";
   ageMonths: number;
   birthYear: number;
+  birthEstimated?: boolean;
   count: number;
   animalId?: string;
   tag?: string;
@@ -179,11 +181,13 @@ export function projectOwnership(
   let cash = base.cash;
   type Cohort = {
     id: string;
+    motherId?: string;
     animalId?: string;
     tag?: string;
     sex: "F" | "M";
     age: number;
     birthYear: number;
+    birthEstimated?: boolean;
     count: number;
     weight: number;
     owner: string;
@@ -195,6 +199,7 @@ export function projectOwnership(
     animalId: a.id,
     tag: a.tag,
     birthYear: Number(a.born.slice(0, 4)),
+    birthEstimated: !!a.details && a.details.birthSource !== "known",
     sex: a.sex,
     age: ageMonths(a.born, now),
     count: 1,
@@ -213,10 +218,12 @@ export function projectOwnership(
       .filter((c) => c.count > 1e-9)
       .map((c) => ({
         id: c.id,
+        ...(c.motherId ? { motherId: c.motherId } : {}),
         owner: c.owner,
         sex: c.sex,
         ageMonths: Math.floor(c.age + 1e-8),
         birthYear: c.birthYear,
+        ...(c.birthEstimated ? { birthEstimated: true } : {}),
         count: c.count,
         ...(c.animalId ? { animalId: c.animalId, tag: c.tag } : {}),
       }));
@@ -327,6 +334,7 @@ export function projectOwnership(
             if (!count) continue;
             newborns.push({
               id: `projected-${c.owner}-${year}-${sex}-${group}`,
+              motherId: c.id,
               birthYear,
               sex,
               age,
