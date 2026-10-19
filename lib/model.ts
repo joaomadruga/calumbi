@@ -10,7 +10,7 @@ export type Animal = {
 export type Movement = {
   id: string;
   date: string;
-  kind: "cadastro" | "compra" | "venda" | "morte" | "transferencia";
+  kind: "cadastro" | "compra" | "venda" | "morte" | "transferencia" | "edicao";
   animalId: string;
   tag: string;
   fromOwner: string;

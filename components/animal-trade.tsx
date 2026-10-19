@@ -17,6 +17,8 @@ import {
   money,
 } from "@/lib/model";
 
+import WeightField from "./weight-field";
+import { weightLabel } from "@/lib/weight";
 type Props = {
   farm: Farm;
   kind: "purchase" | "sale" | "transfer";
@@ -114,10 +116,7 @@ export default function AnimalTrade({
               <span>Nascimento</span>
               <input name="born" type="date" max={today()} required />
             </label>
-            <label className="field">
-              <span>Peso vivo (kg, opcional)</span>
-              <input name="weight" type="number" min="1" max="1500" step=".1" />
-            </label>
+            <WeightField yieldPercent={farm.settings.yield} />
             <label className="field">
               <span>Proprietário do animal</span>
               <select name="owner" required defaultValue="">
@@ -161,7 +160,7 @@ export default function AnimalTrade({
               {visible.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.tag || `ID ${a.id.slice(0, 8)}`} · {ownerName(a.owner)} ·{" "}
-                  {a.weight ? `${a.weight} kg` : "Peso não informado"}
+                  {weightLabel(a.weight, farm.settings.yield)}
                 </option>
               ))}
             </select>
@@ -297,6 +296,7 @@ export function AnimalHistory({
     farm.investors.find((p) => p.id === id)?.name ?? "Fora da fazenda";
   const labels = {
     cadastro: "Cadastro",
+    edicao: "Edição",
     compra: "Compra",
     venda: "Venda",
     morte: "Morte",
@@ -320,7 +320,9 @@ export function AnimalHistory({
                   </small>
                 </strong>
                 <p>
-                  {names(m.fromOwner)} → {names(m.toOwner)}
+                  {m.kind === "edicao"
+                    ? m.note
+                    : `${names(m.fromOwner)} → ${names(m.toOwner)}`}
                   {m.amount > 0 && <span> · {money(m.amount)}</span>}
                 </p>
               </div>

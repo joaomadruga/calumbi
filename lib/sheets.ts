@@ -176,7 +176,7 @@ export async function writeAction(f: Farm, a: Action) {
     ]),
   );
   let animalRows: unknown[][] | undefined;
-  if (a.type === "status" || a.type === "transfer") {
+  if (a.type === "status" || a.type === "transfer" || a.type === "editAnimal") {
     const raw = await sheets(
       "/values/" +
         encodeURIComponent("Animais!A1:H10001") +
@@ -199,7 +199,9 @@ export function buildWriteRequests(
       appendCells: {
         sheetId: ids[tab],
         rows: [
-          cells(headers[tab].map((k) => record[k as keyof typeof record])),
+          cells(
+            headers[tab].map((k) => record[k as keyof typeof record] ?? ""),
+          ),
         ],
         fields: "userEnteredValue",
       },
@@ -212,6 +214,29 @@ export function buildWriteRequests(
         ids,
       ),
     );
+  }
+  if (a.type === "editAnimal") {
+    const index = (animalRows ?? []).findIndex((row) => row[0] === a.data.id);
+    const row = animalRows?.[index];
+    const keys = ["id", "tag", "sex", "born", "weight", "owner"] as const;
+    if (
+      index < 1 ||
+      !row ||
+      row[7] !== "ativo" ||
+      keys.some(
+        (k, i) =>
+          (k === "weight" ? Number(row[i] || 0) : String(row[i] ?? "")) !==
+          a.previous[k],
+      )
+    )
+      throw new Error("O animal foi alterado. Atualize os dados.");
+    requests.push({
+      updateCells: {
+        start: { sheetId: ids.Animais, rowIndex: index, columnIndex: 1 },
+        rows: [cells([a.data.tag, a.data.sex, a.data.born, a.data.weight])],
+        fields: "userEnteredValue",
+      },
+    });
   }
   if (a.type === "animal") append("Animais", a.data);
   if (a.type === "purchase") {

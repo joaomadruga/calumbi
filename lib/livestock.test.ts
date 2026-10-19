@@ -388,3 +388,78 @@ test("batch validation rejects invalid quantities and duplicate tags before writ
     /Peso/,
   );
 });
+
+test("editing preserves identity, owner, status and cash while recording history", () => {
+  const f = farm();
+  const original = f.animals[0];
+  const action = validateAction(
+    {
+      type: "editAnimal",
+      data: { ...original, tag: "Updated", weight: 480, previous: original },
+    },
+    f,
+  );
+  const validated = validateAction(action, f);
+  assert.equal(validated.type, "editAnimal");
+  const next = applyAction(f, validated);
+  assert.equal(next.animals.length, f.animals.length);
+  assert.equal(next.animals[0].id, original.id);
+  assert.equal(next.animals[0].owner, original.owner);
+  assert.equal(next.animals[0].weight, 480);
+  assert.equal(summary(next).cash, summary(f).cash);
+  assert.equal(next.movements?.[0].kind, "edicao");
+  const raw = [
+    headers.Animais,
+    [],
+    [
+      original.id,
+      original.tag,
+      original.sex,
+      original.born,
+      original.weight,
+      original.owner,
+      "Old area",
+      original.status,
+    ],
+  ];
+  const requests = buildWriteRequests(
+    f,
+    validated,
+    { Animais: 1, Movimentacoes: 2 },
+    raw,
+  ) as any[];
+  assert.equal(requests[0].updateCells.start.rowIndex, 2);
+  assert.equal(requests[0].updateCells.start.columnIndex, 1);
+  assert.equal(requests[0].updateCells.rows[0].values.length, 4);
+  raw[2][4] = 999;
+  assert.throws(() =>
+    buildWriteRequests(f, validated, { Animais: 1, Movimentacoes: 2 }, raw),
+  );
+  assert.throws(() => applyAction(next, validated));
+});
+
+test("editing rejects duplicate tags, owner changes, stale data and inactive animals", () => {
+  const f = farm(),
+    original = f.animals[0];
+  const edit = (data: object, current = f) =>
+    validateAction(
+      {
+        type: "editAnimal",
+        data: { ...original, previous: original, ...data },
+      },
+      current,
+    );
+  assert.throws(() => edit({ tag: f.animals[1].tag }), /brinco/);
+  assert.throws(() => edit({ owner: "b" }), /Transferir/);
+  assert.throws(
+    () => edit({ previous: { ...original, weight: 999 } }),
+    /alterado/,
+  );
+  assert.throws(
+    () => edit({}, { ...f, animals: [{ ...original, status: "vendido" }] }),
+    /ativo/,
+  );
+  const action = edit({ tag: "", weight: 0 });
+  assert.equal(action.type, "editAnimal");
+  if (action.type === "editAnimal") assert.equal(action.data.weight, 0);
+});

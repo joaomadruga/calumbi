@@ -8,6 +8,7 @@ import {
   defaultSettings,
 } from "./model.ts";
 export type Action =
+  | { type: "editAnimal"; data: Animal; previous: Animal; movement: Movement }
   | { type: "animals"; data: { animals: Animal[] }; movements: Movement[] }
   | { type: "animal"; data: Animal; movement: Movement }
   | {
@@ -96,6 +97,54 @@ export function validateAction(input: unknown, f: Farm): Action {
     )
       return fail("Revise preços, capacidade e idades de reprodução/descarte.");
     return { type, data: s };
+  }
+  if (type === "editAnimal") {
+    const current = f.animals.find(
+      (a) => a.id === data.id && a.status === "ativo",
+    );
+    if (!current) return fail("Animal não está ativo. Atualize os dados.");
+    const previous = data.previous ?? (input as { previous?: Animal }).previous;
+    const keys = [
+      "id",
+      "tag",
+      "sex",
+      "born",
+      "weight",
+      "owner",
+      "status",
+    ] as const;
+    if (
+      !previous ||
+      typeof previous !== "object" ||
+      keys.some((k) => (previous as Animal)[k] !== current[k])
+    )
+      return fail("O animal foi alterado. Atualize os dados antes de editar.");
+    if (data.owner !== current.owner)
+      return fail("Use Transferir para alterar o proprietário.");
+    const checked = validateAction(
+      { type: "animal", data },
+      { ...f, animals: f.animals.filter((a) => a.id !== current.id) },
+    );
+    if (checked.type !== "animal") return fail("Animal inválido.");
+    const updated = {
+      ...checked.data,
+      id: current.id,
+      owner: current.owner,
+      status: current.status,
+    };
+    return {
+      type,
+      data: updated,
+      previous: current,
+      movement: {
+        ...checked.movement,
+        kind: "edicao",
+        animalId: current.id,
+        fromOwner: current.owner,
+        toOwner: current.owner,
+        note: `Edição: brinco ${current.tag || "não informado"} → ${updated.tag || "não informado"}; sexo ${current.sex} → ${updated.sex}; nascimento ${current.born} → ${updated.born}; peso vivo ${current.weight} → ${updated.weight} kg`,
+      },
+    };
   }
   if (type === "animals") {
     const entries = data.animals;
@@ -309,6 +358,16 @@ export function applyAction(f: Farm, a: Action): Farm {
       movements: [...(f.movements ?? []), ...a.movements],
     };
   const movements = [...(f.movements ?? []), a.movement];
+  if (a.type === "editAnimal") {
+    const current = f.animals.find((x) => x.id === a.data.id);
+    if (!current || JSON.stringify(current) !== JSON.stringify(a.previous))
+      return fail("O animal foi alterado. Atualize os dados.");
+    return {
+      ...f,
+      animals: f.animals.map((x) => (x.id === a.data.id ? a.data : x)),
+      movements,
+    };
+  }
   if (a.type === "animal")
     return { ...f, animals: [...f.animals, a.data], movements };
   if (a.type === "purchase")

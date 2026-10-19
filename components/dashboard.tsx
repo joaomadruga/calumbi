@@ -62,6 +62,9 @@ import {
   animalValue,
 } from "@/lib/model";
 import { applyAction, validateAction } from "@/lib/actions";
+import WeightField from "./weight-field";
+import AnimalEditor from "./animal-editor";
+import { weightLabel } from "@/lib/weight";
 import FarmMap from "./farm-map";
 import CalumbiMark from "./calumbi-mark";
 import CorralCamera from "./corral-camera";
@@ -1050,9 +1053,10 @@ export default function Dashboard({
                                     {ageMonths(a.born)} meses{" "}
                                     <span className="muted">
                                       /{" "}
-                                      {a.weight
-                                        ? `${a.weight} kg`
-                                        : "Peso não informado"}
+                                      {weightLabel(
+                                        a.weight,
+                                        farm.settings.yield,
+                                      )}
                                     </span>
                                   </td>
                                   <td>
@@ -1075,6 +1079,14 @@ export default function Dashboard({
                                   <td>
                                     {a.status === "ativo" ? (
                                       <div className="animal-row-actions">
+                                        <button
+                                          onClick={() => {
+                                            setSelectedAnimal(a);
+                                            setModal("editAnimal");
+                                          }}
+                                        >
+                                          Editar
+                                        </button>
                                         <button
                                           onClick={() => {
                                             setSelectedAnimal(a);
@@ -1907,6 +1919,7 @@ export default function Dashboard({
               {
                 (
                   {
+                    editAnimal: "Editar animal.",
                     animal: "Adicionar animais ao rebanho.",
                     investor: "Mais uma pessoa para crescer junto.",
                     transaction: "Registrar movimentação.",
@@ -1940,6 +1953,15 @@ export default function Dashboard({
                   onSave={save}
                 />
               )}
+            {modal === "editAnimal" && selectedAnimal && farm && (
+              <AnimalEditor
+                key={selectedAnimal.id}
+                animal={selectedAnimal}
+                farm={farm}
+                busy={busy}
+                onSave={save}
+              />
+            )}
             {modal === "animal" && (
               <form onSubmit={(e) => handleForm(e, "animal")}>
                 <div className="form-grid">
@@ -1973,15 +1995,7 @@ export default function Dashboard({
                   <Field label="Nascimento">
                     <input name="born" type="date" max={today()} required />
                   </Field>
-                  <Field label="Peso vivo por animal (kg, opcional)">
-                    <input
-                      name="weight"
-                      type="number"
-                      min="1"
-                      max="1500"
-                      step=".1"
-                    />
-                  </Field>
+                  <WeightField yieldPercent={farm?.settings.yield ?? 50} />
                   <Field label="Participante">
                     <select name="owner" required>
                       <option value="">Selecione</option>
@@ -2109,9 +2123,10 @@ export default function Dashboard({
                     <div>
                       <dt>Peso vivo</dt>
                       <dd>
-                        {selectedAnimal.weight
-                          ? `${selectedAnimal.weight} kg`
-                          : "Não informado"}
+                        {weightLabel(
+                          selectedAnimal.weight,
+                          farm.settings.yield,
+                        )}
                       </dd>
                     </div>
                     <div>
