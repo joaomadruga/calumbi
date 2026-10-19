@@ -327,3 +327,65 @@ test("Sheets sale plans status, receipt and audit event in one batch and rejects
   raw[1][7] = "vendido";
   assert.throws(() => buildWriteRequests(f, a, ids, raw));
 });
+
+test("batch registration creates 90 independent animals without tags or weights and revalidates", () => {
+  const f = farm();
+  const input = {
+    type: "animals",
+    data: {
+      animals: Array.from({ length: 90 }, () => ({
+        sex: "F",
+        born: "2025-01-01",
+        owner: "a",
+        paddock: "Recria",
+      })),
+    },
+  };
+  const validated = validateAction(input, f);
+  const action = validateAction(validated, f);
+  assert.equal(action.type, "animals");
+  if (action.type !== "animals") throw new Error("Expected batch");
+  assert.equal(new Set(action.data.animals.map((a) => a.id)).size, 90);
+  assert.ok(action.data.animals.every((a) => a.weight === 0 && a.tag === ""));
+  const next = applyAction(f, action);
+  assert.equal(next.animals.length, 92);
+  assert.equal(next.movements?.length, 90);
+  assert.equal(summary(next).cash, summary(f).cash);
+  const requests = buildWriteRequests(f, action, {
+    Animais: 1,
+    Participantes: 2,
+    Lancamentos: 3,
+    Configuracoes: 4,
+  }) as any[];
+  assert.equal(requests.filter((r) => r.addSheet).length, 1);
+  assert.equal(requests.filter((r) => r.appendCells?.sheetId === 1).length, 90);
+  assert.equal(requests.filter((r) => r.appendCells?.sheetId === 5).length, 91);
+});
+
+test("batch validation rejects invalid quantities and duplicate tags before writing", () => {
+  const f = farm();
+  for (const animals of [[], Array(501).fill({})])
+    assert.throws(() =>
+      validateAction({ type: "animals", data: { animals } }, f),
+    );
+  const animal = {
+    sex: "F",
+    born: "2025-01-01",
+    owner: "a",
+    paddock: "Recria",
+    tag: "repeat",
+  };
+  assert.throws(
+    () =>
+      validateAction(
+        { type: "animals", data: { animals: [animal, animal] } },
+        f,
+      ),
+    /brinco/,
+  );
+  assert.throws(
+    () =>
+      validateAction({ type: "animal", data: { ...animal, weight: -1 } }, f),
+    /Peso/,
+  );
+});

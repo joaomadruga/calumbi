@@ -8,6 +8,7 @@ import {
   defaultSettings,
 } from "./model.ts";
 export type Action =
+  | { type: "animals"; data: { animals: Animal[] }; movements: Movement[] }
   | { type: "animal"; data: Animal; movement: Movement }
   | {
       type: "purchase";
@@ -96,6 +97,22 @@ export function validateAction(input: unknown, f: Farm): Action {
       return fail("Revise preços, capacidade e idades de reprodução/descarte.");
     return { type, data: s };
   }
+  if (type === "animals") {
+    const entries = data.animals;
+    if (!Array.isArray(entries) || entries.length < 1 || entries.length > 500)
+      return fail("Cadastre entre 1 e 500 animais por lote.");
+    let next = f;
+    const animals: Animal[] = [];
+    const movements: Movement[] = [];
+    for (const entry of entries) {
+      const action = validateAction({ type: "animal", data: entry }, next);
+      if (action.type !== "animal") return fail("Animal inválido.");
+      animals.push(action.data);
+      movements.push(action.movement);
+      next = applyAction(next, action);
+    }
+    return { type, data: { animals }, movements };
+  }
   if (type === "animal" || type === "purchase") {
     const info =
       type === "purchase" && data.animal && typeof data.animal === "object"
@@ -103,7 +120,10 @@ export function validateAction(input: unknown, f: Farm): Action {
         : data;
     const a: Animal = {
       id: crypto.randomUUID(),
-      tag: text(info.tag, "Brinco"),
+      tag:
+        info.tag === undefined || info.tag === null || info.tag === ""
+          ? ""
+          : text(info.tag, "Brinco"),
       sex:
         info.sex === "F"
           ? "F"
@@ -111,14 +131,20 @@ export function validateAction(input: unknown, f: Farm): Action {
             ? "M"
             : fail("Sexo inválido."),
       born: date(info.born),
-      weight: number(info.weight, "Peso", 1, 1500),
+      weight:
+        info.weight === undefined || info.weight === null || info.weight === ""
+          ? 0
+          : number(info.weight, "Peso", 0, 1500),
       owner: text(info.owner, "Participante"),
       paddock: text(info.paddock, "Piquete"),
       status: "ativo",
     };
     if (new Date(a.born) > new Date())
       return fail("Nascimento não pode estar no futuro.");
-    if (f.animals.some((x) => x.tag.toLowerCase() === a.tag.toLowerCase()))
+    if (
+      a.tag &&
+      f.animals.some((x) => x.tag.toLowerCase() === a.tag.toLowerCase())
+    )
       return fail("Esse brinco já existe.");
     if (!f.investors.some((i) => i.id === a.owner))
       return fail("Participante não encontrado.");
@@ -279,6 +305,12 @@ export function applyAction(f: Farm, a: Action): Farm {
   if (a.type === "transaction")
     return { ...f, transactions: [...f.transactions, a.data] };
   if (a.type === "settings") return { ...f, settings: a.data };
+  if (a.type === "animals")
+    return {
+      ...f,
+      animals: [...f.animals, ...a.data.animals],
+      movements: [...(f.movements ?? []), ...a.movements],
+    };
   const movements = [...(f.movements ?? []), a.movement];
   if (a.type === "animal")
     return { ...f, animals: [...f.animals, a.data], movements };

@@ -322,6 +322,24 @@ export default function Dashboard({
       data.id = selectedAnimal!.id;
       data.owner = selectedAnimal!.owner;
     }
+    if (type === "animal") {
+      const quantity = Number(data.quantity || 1);
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
+        setError("Escolha uma quantidade entre 1 e 500.");
+        return;
+      }
+      const tag = String(data.tag || "").trim();
+      void save({
+        type: "animals",
+        data: {
+          animals: Array.from({ length: quantity }, (_, i) => ({
+            ...data,
+            tag: tag && quantity > 1 ? `${tag}-${i + 1}` : tag,
+          })),
+        },
+      });
+      return;
+    }
     void save({ type, data });
   }
   function exportCSV() {
@@ -1000,7 +1018,7 @@ export default function Dashboard({
                                     filter === "Histórico" ||
                                     a.paddock === filter ||
                                     category(a) === filter) &&
-                                  `${a.tag} ${a.id} ${farm.investors.find((i) => i.id === a.owner)?.name ?? ""}`
+                                  `${a.tag || `ID ${a.id.slice(0, 8)}`} ${a.id} ${farm.investors.find((i) => i.id === a.owner)?.name ?? ""}`
                                     .toLowerCase()
                                     .includes(search.toLowerCase()),
                               )
@@ -1018,7 +1036,9 @@ export default function Dashboard({
                                         <Fence size={18} />
                                       </span>
                                       <span>
-                                        <strong>{a.tag}</strong>
+                                        <strong>
+                                          {a.tag || `ID ${a.id.slice(0, 8)}`}
+                                        </strong>
                                         <small
                                           className="animal-short-id"
                                           title={a.id}
@@ -1032,7 +1052,10 @@ export default function Dashboard({
                                   <td>
                                     {ageMonths(a.born)} meses{" "}
                                     <span className="muted">
-                                      / {a.weight} kg
+                                      /{" "}
+                                      {a.weight
+                                        ? `${a.weight} kg`
+                                        : "Peso não informado"}
                                     </span>
                                   </td>
                                   <td>
@@ -1073,7 +1096,7 @@ export default function Dashboard({
                                             setSelectedAnimal(a);
                                             setModal("transfer");
                                           }}
-                                          aria-label={`Transferir ${a.tag}`}
+                                          aria-label={`Transferir ${a.tag || `ID ${a.id.slice(0, 8)}`}`}
                                         >
                                           <ArrowLeftRight size={13} />{" "}
                                           Transferir
@@ -1892,10 +1915,12 @@ export default function Dashboard({
               {
                 (
                   {
-                    animal: "Um novo animal no rebanho.",
+                    animal: "Adicionar animais ao rebanho.",
                     investor: "Mais uma pessoa para crescer junto.",
                     transaction: "Registrar movimentação.",
-                    detail: selectedAnimal?.tag,
+                    detail:
+                      selectedAnimal?.tag ||
+                      `ID ${selectedAnimal?.id.slice(0, 8)}`,
                     status: "Registrar morte do animal.",
                     purchase: "Comprar e vincular um animal.",
                     sale: "Vender um animal do rebanho.",
@@ -1926,11 +1951,24 @@ export default function Dashboard({
             {modal === "animal" && (
               <form onSubmit={(e) => handleForm(e, "animal")}>
                 <div className="form-grid">
-                  <Field label="Brinco / identificação">
+                  <Field label="Quantidade de animais">
+                    <input
+                      name="quantity"
+                      type="number"
+                      min="1"
+                      max="500"
+                      defaultValue="1"
+                      required
+                    />
+                    <small>
+                      Os animais terão o mesmo sexo, nascimento, participante e
+                      piquete. Cada um recebe um ID único.
+                    </small>
+                  </Field>
+                  <Field label="Brinco / identificação (opcional)">
                     <input
                       name="tag"
-                      placeholder="CL-049"
-                      required
+                      placeholder="Ex.: CL. Em lote: CL-1, CL-2…"
                       maxLength={30}
                     />
                   </Field>
@@ -1943,14 +1981,13 @@ export default function Dashboard({
                   <Field label="Nascimento">
                     <input name="born" type="date" max={today()} required />
                   </Field>
-                  <Field label="Peso vivo (kg)">
+                  <Field label="Peso vivo por animal (kg, opcional)">
                     <input
                       name="weight"
                       type="number"
                       min="1"
                       max="1500"
                       step=".1"
-                      required
                     />
                   </Field>
                   <Field label="Participante">
@@ -1963,8 +2000,11 @@ export default function Dashboard({
                       ))}
                     </select>
                   </Field>
-                  <Field label="Piquete">
-                    <select name="paddock">
+                  <Field label="Piquete — área onde o gado fica">
+                    <select
+                      name="paddock"
+                      aria-description="Área cercada do pasto onde os animais ficam."
+                    >
                       {["Maternidade", "Recria", "Bezerreiro", "Engorda"].map(
                         (p) => (
                           <option key={p}>{p}</option>
@@ -1974,7 +2014,9 @@ export default function Dashboard({
                   </Field>
                 </div>
                 <p className="form-note">
-                  Novas crias devem ser registradas com o participante
+                  Piquete é uma área cercada do pasto onde o gado fica. Sem peso
+                  informado, o animal não entra na estimativa de valor por
+                  arroba. Novas crias devem ser registradas com o participante
                   proprietário. Para uma compra, use “Comprar gado”: o animal e
                   a despesa são registrados juntos.
                 </p>
@@ -2087,7 +2129,11 @@ export default function Dashboard({
                     </div>
                     <div>
                       <dt>Peso vivo</dt>
-                      <dd>{selectedAnimal.weight} kg</dd>
+                      <dd>
+                        {selectedAnimal.weight
+                          ? `${selectedAnimal.weight} kg`
+                          : "Não informado"}
+                      </dd>
                     </div>
                     <div>
                       <dt>Participante</dt>

@@ -194,6 +194,15 @@ export function buildWriteRequests(
         fields: "userEnteredValue",
       },
     });
+  if (a.type === "animals") {
+    return a.data.animals.flatMap((animal, index) =>
+      buildWriteRequests(
+        f,
+        { type: "animal", data: animal, movement: a.movements[index] },
+        ids,
+      ),
+    );
+  }
   if (a.type === "animal") append("Animais", a.data);
   if (a.type === "purchase") {
     append("Animais", a.data.animal);
@@ -233,7 +242,7 @@ export function buildWriteRequests(
   }
   if ("movement" in a) {
     if (ids.Movimentacoes === undefined) {
-      ids = { ...ids, Movimentacoes: Math.max(0, ...Object.values(ids)) + 1 };
+      ids.Movimentacoes = Math.max(0, ...Object.values(ids)) + 1;
       requests.push({
         addSheet: {
           properties: {

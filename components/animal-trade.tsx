@@ -49,7 +49,7 @@ export default function AnimalTrade({
   const visible = animals.filter(
     (a) =>
       a.id === animalId ||
-      `${a.tag} ${a.id} ${ownerName(a.owner)}`
+      `${a.tag || `ID ${a.id.slice(0, 8)}`} ${a.id} ${ownerName(a.owner)}`
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
@@ -100,13 +100,8 @@ export default function AnimalTrade({
           </div>
           <div className="form-grid">
             <label className="field">
-              <span>Brinco / identificação</span>
-              <input
-                name="tag"
-                defaultValue={suggestedTag}
-                required
-                maxLength={30}
-              />
+              <span>Brinco / identificação (opcional)</span>
+              <input name="tag" placeholder={suggestedTag} maxLength={30} />
             </label>
             <label className="field">
               <span>Sexo</span>
@@ -120,15 +115,8 @@ export default function AnimalTrade({
               <input name="born" type="date" max={today()} required />
             </label>
             <label className="field">
-              <span>Peso vivo (kg)</span>
-              <input
-                name="weight"
-                type="number"
-                min="1"
-                max="1500"
-                step=".1"
-                required
-              />
+              <span>Peso vivo (kg, opcional)</span>
+              <input name="weight" type="number" min="1" max="1500" step=".1" />
             </label>
             <label className="field">
               <span>Proprietário do animal</span>
@@ -142,7 +130,7 @@ export default function AnimalTrade({
               </select>
             </label>
             <label className="field">
-              <span>Piquete</span>
+              <span>Piquete — área cercada do pasto onde o gado fica</span>
               <select name="paddock">
                 {["Maternidade", "Recria", "Bezerreiro", "Engorda"].map((p) => (
                   <option key={p}>{p}</option>
@@ -180,7 +168,8 @@ export default function AnimalTrade({
               <option value="">Selecione um animal ativo</option>
               {visible.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.tag} · {ownerName(a.owner)} · {a.weight} kg
+                  {a.tag || `ID ${a.id.slice(0, 8)}`} · {ownerName(a.owner)} ·{" "}
+                  {a.weight ? `${a.weight} kg` : "Peso não informado"}
                 </option>
               ))}
             </select>
@@ -191,7 +180,9 @@ export default function AnimalTrade({
                 <Tag size={19} />
               </span>
               <div>
-                <strong>{selected.tag}</strong>
+                <strong>
+                  {selected.tag || `ID ${selected.id.slice(0, 8)}`}
+                </strong>
                 <span>Proprietário: {ownerName(selected.owner)}</span>
                 <code>ID: {selected.id}</code>
               </div>
