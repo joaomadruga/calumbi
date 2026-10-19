@@ -129,14 +129,6 @@ export default function AnimalTrade({
                 ))}
               </select>
             </label>
-            <label className="field">
-              <span>Piquete — área cercada do pasto onde o gado fica</span>
-              <select name="paddock">
-                {["Maternidade", "Recria", "Bezerreiro", "Engorda"].map((p) => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
-            </label>
           </div>
         </>
       ) : (

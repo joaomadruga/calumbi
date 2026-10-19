@@ -128,6 +128,7 @@ export default function Dashboard({
     [menu, setMenu] = useState(false),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("Todos"),
+    [herdOwner, setHerdOwner] = useState("all"),
     [years, setYears] = useState(5),
     [fib, setFib] = useState(false),
     [scenario, setScenario] = useState("base"),
@@ -684,7 +685,14 @@ export default function Dashboard({
                               }{" "}
                               matrizes
                             </span>
-                            <span>Raça Nelore</span>
+                            <span>
+                              Máximo: {farm.settings.capacity} cabeças ·{" "}
+                              {Math.max(
+                                0,
+                                farm.settings.capacity - stats.herd.length,
+                              )}{" "}
+                              vagas
+                            </span>
                           </>
                         }
                       />
@@ -745,40 +753,9 @@ export default function Dashboard({
                             go("herd");
                           }}
                         />
-                        <div className="map-legend">
-                          {[
-                            "Maternidade",
-                            "Recria",
-                            "Bezerreiro",
-                            "Engorda",
-                          ].map((p, i) => (
-                            <button
-                              key={p}
-                              onClick={() => {
-                                setFilter(p);
-                                go("herd");
-                              }}
-                            >
-                              <span
-                                style={{
-                                  background: [
-                                    "#9fb888",
-                                    "#b6c898",
-                                    "#c5d4ab",
-                                    "#8fae78",
-                                  ][i],
-                                }}
-                              />
-                              {p}
-                              <strong>
-                                {
-                                  stats.herd.filter((a) => a.paddock === p)
-                                    .length
-                                }
-                              </strong>
-                            </button>
-                          ))}
-                        </div>
+                        <p className="form-note">
+                          Criação de Nelore com foco na venda dos bezerros.
+                        </p>
                       </section>
                       <section className="card investor-card">
                         <CardHeading
@@ -941,7 +918,8 @@ export default function Dashboard({
                         title="Rebanho Nelore"
                         right={
                           <span className="soft-badge">
-                            {stats.herd.length} ativos · {farm.animals.length}{" "}
+                            {stats.herd.length} ativos / máximo{" "}
+                            {farm.settings.capacity} · {farm.animals.length}{" "}
                             registros
                           </span>
                         }
@@ -967,15 +945,34 @@ export default function Dashboard({
                             "Novilhas",
                             "Bezerros",
                             "Machos",
-                            "Maternidade",
-                            "Recria",
-                            "Bezerreiro",
-                            "Engorda",
+
                             "Histórico",
                           ].map((x) => (
                             <option key={x}>{x}</option>
                           ))}
                         </select>
+                        <select
+                          aria-label="Filtrar por participante"
+                          value={herdOwner}
+                          onChange={(e) => setHerdOwner(e.target.value)}
+                        >
+                          <option value="all">Todos os participantes</option>
+                          {farm.investors.map((i) => (
+                            <option key={i.id} value={i.id}>
+                              {i.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="button secondary"
+                          onClick={() => {
+                            setSearch("");
+                            setFilter("Todos");
+                            setHerdOwner("all");
+                          }}
+                        >
+                          Limpar filtros
+                        </button>
                       </div>
                       <div className="herd-quick-actions">
                         <span>
@@ -1001,7 +998,6 @@ export default function Dashboard({
                               <th>Categoria</th>
                               <th>Idade / peso vivo</th>
                               <th>Participante</th>
-                              <th>Piquete</th>
                               <th>Valor estimado</th>
                               <th>Situação</th>
                               <th>Ações</th>
@@ -1016,8 +1012,9 @@ export default function Dashboard({
                                     : a.status === "ativo") &&
                                   (filter === "Todos" ||
                                     filter === "Histórico" ||
-                                    a.paddock === filter ||
                                     category(a) === filter) &&
+                                  (herdOwner === "all" ||
+                                    a.owner === herdOwner) &&
                                   `${a.tag || `ID ${a.id.slice(0, 8)}`} ${a.id} ${farm.investors.find((i) => i.id === a.owner)?.name ?? ""}`
                                     .toLowerCase()
                                     .includes(search.toLowerCase()),
@@ -1062,11 +1059,6 @@ export default function Dashboard({
                                     {farm.investors.find(
                                       (i) => i.id === a.owner,
                                     )?.name ?? "Sem vínculo"}
-                                  </td>
-                                  <td>
-                                    <span className="soft-badge">
-                                      {a.paddock}
-                                    </span>
                                   </td>
                                   <td>
                                     {money(
@@ -1961,8 +1953,8 @@ export default function Dashboard({
                       required
                     />
                     <small>
-                      Os animais terão o mesmo sexo, nascimento, participante e
-                      piquete. Cada um recebe um ID único.
+                      Os animais terão o mesmo sexo, nascimento, participante.
+                      Cada um recebe um ID único.
                     </small>
                   </Field>
                   <Field label="Brinco / identificação (opcional)">
@@ -2000,25 +1992,12 @@ export default function Dashboard({
                       ))}
                     </select>
                   </Field>
-                  <Field label="Piquete — área onde o gado fica">
-                    <select
-                      name="paddock"
-                      aria-description="Área cercada do pasto onde os animais ficam."
-                    >
-                      {["Maternidade", "Recria", "Bezerreiro", "Engorda"].map(
-                        (p) => (
-                          <option key={p}>{p}</option>
-                        ),
-                      )}
-                    </select>
-                  </Field>
                 </div>
                 <p className="form-note">
-                  Piquete é uma área cercada do pasto onde o gado fica. Sem peso
-                  informado, o animal não entra na estimativa de valor por
-                  arroba. Novas crias devem ser registradas com o participante
-                  proprietário. Para uma compra, use “Comprar gado”: o animal e
-                  a despesa são registrados juntos.
+                  Sem peso informado, o animal não entra na estimativa de valor
+                  por arroba. Novas crias devem ser registradas com o
+                  participante proprietário. Para uma compra, use “Comprar
+                  gado”: o animal e a despesa são registrados juntos.
                 </p>
                 <Submit busy={busy} />
               </form>

@@ -2,38 +2,14 @@
 import { useState } from "react";
 import { type Animal } from "@/lib/model";
 import { Maximize2, Minus, Plus, MapPin, Sprout } from "lucide-react";
-const paddocks = [
+const areas = [
   {
-    name: "Maternidade",
-    label: "01",
-    d: "M170 85 L400 115 L340 267 L105 222 Z",
-    x: 245,
-    y: 155,
+    name: "Rebanho Nelore",
+    label: "Calumbi",
+    d: "M170 85 L650 156 L488 489 L30 373 Z",
+    x: 320,
+    y: 240,
     color: "#b5c89b",
-  },
-  {
-    name: "Recria",
-    label: "02",
-    d: "M415 118 L650 156 L573 316 L353 269 Z",
-    x: 485,
-    y: 210,
-    color: "#c5d3a7",
-  },
-  {
-    name: "Bezerreiro",
-    label: "03",
-    d: "M103 236 L334 282 L268 438 L30 373 Z",
-    x: 165,
-    y: 313,
-    color: "#cad7af",
-  },
-  {
-    name: "Engorda",
-    label: "04",
-    d: "M349 287 L571 330 L488 489 L283 440 Z",
-    x: 412,
-    y: 370,
-    color: "#adc397",
   },
 ];
 export default function FarmMap({
@@ -43,7 +19,6 @@ export default function FarmMap({
   animals: Animal[];
   onSelect: (name: string) => void;
 }) {
-  const [selected, setSelected] = useState("Maternidade");
   const [zoom, setZoom] = useState(1);
   return (
     <div className="farm-map">
@@ -58,7 +33,7 @@ export default function FarmMap({
       <svg
         viewBox="0 0 760 545"
         role="img"
-        aria-label="Mapa ilustrativo dos quatro piquetes da fazenda"
+        aria-label="Vista ilustrativa da Fazenda Calumbi"
         className="landscape"
       >
         <defs>
@@ -145,41 +120,37 @@ export default function FarmMap({
             strokeWidth="13"
             fill="none"
           />
-          {paddocks.map((p) => (
+          {areas.map((p) => (
             <g
               key={p.name}
               tabIndex={0}
               role="button"
-              aria-pressed={selected === p.name}
-              aria-label={`Piquete ${p.name}, ${animals.filter((a) => a.paddock === p.name).length} animais`}
-              onClick={() => setSelected(p.name)}
+              aria-label={`Ver rebanho: ${animals.length} animais`}
+              onClick={() => onSelect("Todos")}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  setSelected(p.name);
+                  onSelect("Todos");
                 }
               }}
-              className="paddock"
+              className="farm-area"
             >
               <path
                 d={p.d}
                 fill={p.color}
-                stroke={selected === p.name ? "#4a6845" : "#f7f7e9"}
-                strokeWidth={selected === p.name ? 3 : 4}
+                stroke={true ? "#4a6845" : "#f7f7e9"}
+                strokeWidth={true ? 3 : 4}
               />
               <path d={p.d} fill="url(#grass)" />
               {Array.from(
                 {
-                  length: Math.min(
-                    animals.filter((a) => a.paddock === p.name).length,
-                    12,
-                  ),
+                  length: Math.min(animals.length, 12),
                 },
                 (_, i) => (
                   <use
                     key={i}
                     href="#cow"
-                    transform={`translate(${p.x - 52 + (i % 4) * 30 + (i % 2) * 5} ${p.y + 12 + Math.floor(i / 4) * 23}) scale(${p.name === "Bezerreiro" ? 0.65 : 0.85})`}
+                    transform={`translate(${p.x - 52 + (i % 4) * 30 + (i % 2) * 5} ${p.y + 12 + Math.floor(i / 4) * 23}) scale(0.85)`}
                   />
                 ),
               )}
@@ -265,15 +236,14 @@ export default function FarmMap({
         </g>
       </svg>
       <div className="map-bottom">
-        <button className="paddock-summary" onClick={() => onSelect(selected)}>
+        <button className="herd-map-summary" onClick={() => onSelect("Todos")}>
           <span className="map-pin-icon">
             <Sprout size={19} />
           </span>
           <span>
-            <strong>{selected}</strong>
+            <strong>Rebanho Nelore</strong>
             <small>
-              {animals.filter((a) => a.paddock === selected).length} animais ·
-              Ver rebanho <span>↗</span>
+              {animals.length} animais · Ver rebanho <span>↗</span>
             </small>
           </span>
         </button>

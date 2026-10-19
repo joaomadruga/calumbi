@@ -618,17 +618,17 @@ h2 {
   gap: 4px;
   color: #7f8d71;
 }
-.paddock {
+.farm-area {
   cursor: pointer;
   transition: opacity 0.2s;
 }
-.paddock:hover {
+.farm-area:hover {
   opacity: 0.85;
 }
-.paddock:focus {
+.farm-area:focus {
   outline: none;
 }
-.paddock:focus-visible > path:first-of-type {
+.farm-area:focus-visible > path:first-of-type {
   stroke: var(--sand);
   stroke-width: 4;
   stroke-dasharray: 6 4;
@@ -642,7 +642,7 @@ h2 {
   align-items: flex-end;
   justify-content: space-between;
 }
-.paddock-summary {
+.herd-map-summary {
   display: flex;
   align-items: center;
   text-align: left;
@@ -662,18 +662,18 @@ h2 {
   border-radius: 4px;
   color: #8ba573;
 }
-.paddock-summary strong {
+.herd-map-summary strong {
   font-size: 10px;
   display: block;
   font-weight: 600;
 }
-.paddock-summary small {
+.herd-map-summary small {
   display: block;
   font-size: 7px;
   color: #8e9a83;
   margin-top: 5px;
 }
-.paddock-summary small span {
+.herd-map-summary small span {
   margin-left: 7px;
 }
 .map-zoom {

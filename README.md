@@ -48,12 +48,12 @@ npm run dev
 
 O inicializador cria apenas abas ausentes e cabeçalhos de abas vazias; não apaga dados existentes e não importa exemplos. A integração lê e escreve pelo servidor, usando JWT da conta de serviço e a API REST do Google. Não há banco SQL ou serviço de banco adicional.
 
-| Aba             | Colunas                                                               |
-| --------------- | --------------------------------------------------------------------- |
-| `Animais`       | `id`, `tag`, `sex`, `born`, `weight`, `owner`, `paddock`, `status`    |
-| `Participantes` | `id`, `name`, `color`                                                 |
-| `Lancamentos`   | `id`, `date`, `kind`, `category`, `description`, `amount`, `investor` |
-| `Configuracoes` | `chave`, `valor`                                                      |
+| Aba             | Colunas                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------- |
+| `Animais`       | `id`, `tag`, `sex`, `born`, `weight`, `owner`, `_reserved` (coluna antiga, sem uso), `status` |
+| `Participantes` | `id`, `name`, `color`                                                                         |
+| `Lancamentos`   | `id`, `date`, `kind`, `category`, `description`, `amount`, `investor`                         |
+| `Configuracoes` | `chave`, `valor`                                                                              |
 
 Cadastre primeiro os participantes, depois os animais. `owner` referencia o `id` do participante. As datas são textos ISO `AAAA-MM-DD`; pesos e valores são números, sem símbolos monetários. Preserve nomes de abas e cabeçalhos. `status`: `ativo`, `vendido`, `morto`; `sex`: `F`, `M`; `kind`: `despesa`, `receita`, `aporte`. Os IDs são gerados pela aplicação.
 
@@ -99,7 +99,7 @@ A integração Google está implementada, mas depende das credenciais e da plani
 ## Organização
 
 - `components/dashboard.tsx`: telas, formulários e fluxo da demonstração/Sheets.
-- `components/farm-map.tsx`: mapa interativo dos quatro piquetes.
+- `components/farm-map.tsx`: mapa ilustrativo do rebanho.
 - `components/charts.tsx`: gráficos SVG sem serviço externo.
 - `lib/model.ts`: cotas, patrimônio, custos e projeção.
 - `lib/actions.ts`: validação e atualização de registros.

@@ -136,7 +136,6 @@ export function validateAction(input: unknown, f: Farm): Action {
           ? 0
           : number(info.weight, "Peso", 0, 1500),
       owner: text(info.owner, "Participante"),
-      paddock: text(info.paddock, "Piquete"),
       status: "ativo",
     };
     if (new Date(a.born) > new Date())
@@ -148,8 +147,6 @@ export function validateAction(input: unknown, f: Farm): Action {
       return fail("Esse brinco já existe.");
     if (!f.investors.some((i) => i.id === a.owner))
       return fail("Participante não encontrado.");
-    if (!["Maternidade", "Recria", "Bezerreiro", "Engorda"].includes(a.paddock))
-      return fail("Piquete inválido.");
     const when =
       type === "purchase"
         ? date(data.date)

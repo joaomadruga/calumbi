@@ -18,7 +18,7 @@ const animal = (id: string, overrides: Partial<Animal> = {}): Animal => ({
   born: "2022-10-15",
   weight: 400,
   owner: "a",
-  paddock: "Maternidade",
+
   status: "ativo",
   ...overrides,
 });

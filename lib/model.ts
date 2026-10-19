@@ -5,7 +5,6 @@ export type Animal = {
   born: string;
   weight: number;
   owner: string;
-  paddock: string;
   status: "ativo" | "vendido" | "morto";
 };
 export type Movement = {
@@ -463,14 +462,6 @@ export function demoFarm(): Farm {
             ? 100 + (i % 4) * 20
             : 300 + (i % 6) * 15,
     owner: i < 20 ? "joao" : i < 34 ? "ana" : i < 42 ? "pedro" : "maria",
-    paddock:
-      i < 26
-        ? "Maternidade"
-        : i < 36
-          ? "Recria"
-          : i < 42
-            ? "Bezerreiro"
-            : "Engorda",
     status: "ativo",
   }));
   const day = new Date().toISOString().slice(0, 10);

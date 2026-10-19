@@ -76,8 +76,18 @@ export async function sheets(path: string, body?: unknown) {
     );
   return response.json();
 }
+// The retired column at index 6 remains reserved to preserve existing spreadsheet rows.
 export const headers = {
-  Animais: ["id", "tag", "sex", "born", "weight", "owner", "paddock", "status"],
+  Animais: [
+    "id",
+    "tag",
+    "sex",
+    "born",
+    "weight",
+    "owner",
+    "_reserved",
+    "status",
+  ],
   Participantes: ["id", "name", "color"],
   Lancamentos: [
     "id",

@@ -20,7 +20,7 @@ const cow = (id: string, owner = "a", sex: "F" | "M" = "F"): Animal => ({
   born: "2022-01-01",
   weight: 400,
   owner,
-  paddock: "Maternidade",
+
   status: "ativo",
 });
 const farm = (): Farm => ({
@@ -44,7 +44,7 @@ const purchase = (f: Farm) =>
         born: "2023-01-01",
         weight: 350,
         owner: "a",
-        paddock: "Recria",
+
         date: today,
         amount: 4200,
       },
@@ -337,7 +337,6 @@ test("batch registration creates 90 independent animals without tags or weights 
         sex: "F",
         born: "2025-01-01",
         owner: "a",
-        paddock: "Recria",
       })),
     },
   };
@@ -372,7 +371,7 @@ test("batch validation rejects invalid quantities and duplicate tags before writ
     sex: "F",
     born: "2025-01-01",
     owner: "a",
-    paddock: "Recria",
+
     tag: "repeat",
   };
   assert.throws(

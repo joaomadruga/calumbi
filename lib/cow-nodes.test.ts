@@ -18,7 +18,7 @@ const farm: Farm = {
       sex: "F",
       born: "2026-10-01",
       weight: 100,
-      paddock: "Bezerreiro",
+
       status: "ativo",
     },
   ],
