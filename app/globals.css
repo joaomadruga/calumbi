@@ -4614,3 +4614,33 @@ dd {
     max-width: none;
   }
 }
+
+.radial-canvas.is-wheeling .network-camera {
+  transition: none;
+}
+.genealogy-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 23px;
+  border-top: 1px solid #ece9f0;
+  color: #77758b;
+  font-size: 11px;
+}
+.genealogy-navigation > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.genealogy-navigation .icon-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+@media (max-width: 760px) {
+  .genealogy-navigation {
+    flex-wrap: wrap;
+    padding-inline: 17px;
+  }
+}

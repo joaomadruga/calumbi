@@ -25,9 +25,15 @@ import {
   type NetworkView,
   ownerPosition,
   cowPosition,
-  focusViewport,
+  readableViewport,
+  zoomAt,
 } from "@/lib/network-layout";
-import { genealogyNodes, familyIds, genealogyLayout } from "@/lib/genealogy";
+import {
+  genealogyNodes,
+  familyIds,
+  genealogyLayout,
+  paginateFamilies,
+} from "@/lib/genealogy";
 import { cowStageLabel, cowAgeLabel } from "@/lib/cow-nodes";
 
 type Participant = { id: string; name: string; color: string; share: number };
@@ -84,6 +90,11 @@ export default function HerdEvolution({
   );
   const [view, setView] = useState<NetworkView>("top-down");
   const [zoom, setZoom] = useState(1);
+  const [page, setPage] = useState(0);
+  const [viewportScale, setViewportScale] = useState(1);
+  const [wheeling, setWheeling] = useState(false);
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraRef = useRef({ zoom: 1, pan: { x: 0, y: 0 } });
   const [selectedPart, setSelectedPart] = useState(0);
   const [focusRevision, setFocusRevision] = useState(0);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
@@ -135,10 +146,16 @@ export default function HerdEvolution({
       ),
     [cohortData, snapshot?.year, participants, adultMonths],
   );
-  const visibleFamily = familyIds(
-    Object.values(cowGroups).flat(),
-    selectedSource,
-  );
+  const allNodes = Object.values(cowGroups).flat();
+  const {
+    roots,
+    pageCount,
+    currentPage,
+    ids: pageIds,
+  } = paginateFamilies(allNodes, focusedOwner, page);
+  const visibleFamily = selectedSource
+    ? familyIds(allNodes, selectedSource)
+    : pageIds;
   const treeLayouts = Object.fromEntries(
     participants.map((person) => [
       person.id,
@@ -159,11 +176,35 @@ export default function HerdEvolution({
     }),
   );
   const visiblePeople = participants.filter(
-    (p) => !focusedOwner || p.id === focusedOwner,
+    (p) =>
+      (!focusedOwner || p.id === focusedOwner) &&
+      (!roots.length ||
+        (cowGroups[p.id] ?? []).some((n) => visibleFamily.has(n.sourceIds[0]))),
   );
-  let treeCursor =
-    500 -
-    visiblePeople.reduce((sum, p) => sum + branchWidths[p.id] + 100, -100) / 2;
+  const visibleOwners = new Set(visiblePeople.map((p) => p.id));
+  let panelX = 0,
+    panelY = 0,
+    panelHeight = 0;
+  const panelPositions = new Map<string, { x: number; y: number }>();
+  for (const person of visiblePeople) {
+    const width = branchWidths[person.id];
+    const height =
+      Math.max(0, ...[...treeLayouts[person.id].values()].map((p) => p.y)) +
+      260;
+    if (panelX && panelX + width > 1000) {
+      panelX = 0;
+      panelY += panelHeight + 80;
+      panelHeight = 0;
+    }
+    panelPositions.set(person.id, { x: panelX + width / 2, y: panelY });
+    panelX += width + 100;
+    panelHeight = Math.max(panelHeight, height);
+  }
+  const panelCenter = panelPositions.size
+    ? (Math.min(...[...panelPositions.values()].map((p) => p.x)) +
+        Math.max(...[...panelPositions.values()].map((p) => p.x))) /
+      2
+    : 0;
   const selectedCow = selectedSource
     ? Object.values(cowGroups)
         .flat()
@@ -198,8 +239,9 @@ export default function HerdEvolution({
       focusedOwner === person.id,
     );
     if (view === "top-down" && (!focusedOwner || focusedOwner === person.id)) {
-      branch.x = treeCursor + branchWidths[person.id] / 2;
-      treeCursor += branchWidths[person.id] + 100;
+      const position = panelPositions.get(person.id);
+      branch.x = 500 + (position?.x ?? 0) - panelCenter;
+      branch.y = (focusedOwner ? 150 : 245) + (position?.y ?? 0);
     }
     const animalNodes = (cowGroups[person.id] ?? []).filter((n) =>
       visibleFamily.has(n.sourceIds[0]),
@@ -243,15 +285,23 @@ export default function HerdEvolution({
   const cameraPoints = focusedBranch
     ? [focusedBranch.branch, ...focusedBranch.leaves]
     : [
-        ...branches.flatMap((b) => [b.branch, ...b.leaves]),
+        ...branches
+          .filter((b) => visibleOwners.has(b.person.id))
+          .flatMap((b) => [b.branch, ...b.leaves]),
         { x: 500, y: view === "top-down" ? 85 : 340 },
       ];
-  const camera = focusViewport(cameraPoints, focusedOwner ? 1.8 : 1);
+  const camera = readableViewport(
+    cameraPoints,
+    0.95 / viewportScale,
+    1.6 / viewportScale,
+  );
   useEffect(() => {
+    cameraRef.current = camera;
     setZoom(camera.zoom);
     setPan(camera.pan);
   }, [
     focusedOwner,
+    currentPage,
     selectedSource,
     selectedPart,
     focusRevision,
@@ -269,6 +319,57 @@ export default function HerdEvolution({
     const timer = setTimeout(() => setYear(data[index + 1].year), 1900);
     return () => clearTimeout(timer);
   }, [playing, index, data]);
+  useEffect(() => {
+    cameraRef.current = { zoom, pan };
+  }, [zoom, pan]);
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const observer = new ResizeObserver(() => {
+      const rect = svg.getBoundingClientRect();
+      if (rect.width && rect.height)
+        setViewportScale(Math.min(rect.width / 1000, rect.height / 680));
+    });
+    observer.observe(svg);
+    function wheel(event: WheelEvent) {
+      event.preventDefault();
+      const matrix = svg!.getScreenCTM();
+      if (!matrix) return;
+      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(
+        matrix.inverse(),
+      );
+      const delta =
+        event.deltaY *
+        (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 680 : 1);
+      const next = zoomAt(
+        cameraRef.current,
+        cameraRef.current.zoom *
+          Math.exp(-Math.max(-120, Math.min(120, delta)) * 0.003),
+        point,
+      );
+      cameraRef.current = next;
+      setZoom(next.zoom);
+      setPan(next.pan);
+      setWheeling(true);
+      if (wheelTimer.current) clearTimeout(wheelTimer.current);
+      wheelTimer.current = setTimeout(() => setWheeling(false), 120);
+    }
+    svg.addEventListener("wheel", wheel, { passive: false });
+    return () => {
+      observer.disconnect();
+      svg.removeEventListener("wheel", wheel);
+      if (wheelTimer.current) clearTimeout(wheelTimer.current);
+    };
+  }, [!!snapshot]);
+  const changeZoom = (factor: number) => {
+    const next = zoomAt(cameraRef.current, cameraRef.current.zoom * factor, {
+      x: 500,
+      y: 340,
+    });
+    cameraRef.current = next;
+    setZoom(next.zoom);
+    setPan(next.pan);
+  };
   if (!snapshot || !current) return null;
   const choose = (next: number) => {
     setPlaying(false);
@@ -276,6 +377,7 @@ export default function HerdEvolution({
   };
   const focusOn = (owner: string | null) => {
     setFocusedOwner(owner);
+    setPage(0);
     setSelectedSource(null);
     setFocusRevision((value) => value + 1);
   };
@@ -434,6 +536,36 @@ export default function HerdEvolution({
           <span>Clique em um integrante para aproximar e isolar.</span>
         )}
       </div>
+      {!selectedSource && roots.length > 0 && (
+        <div className="genealogy-navigation">
+          <span>
+            Famílias {currentPage * 6 + 1}–
+            {Math.min((currentPage + 1) * 6, roots.length)} de {roots.length} ·
+            role para ampliar, arraste para explorar
+          </span>
+          <div>
+            <button
+              className="icon-button"
+              aria-label="Famílias anteriores"
+              disabled={currentPage === 0}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span>
+              {currentPage + 1} / {pageCount}
+            </span>
+            <button
+              className="icon-button"
+              aria-label="Próximas famílias"
+              disabled={currentPage === pageCount - 1}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+      )}
       <div
         className={`radial-canvas-shell ${view === "top-down" ? "network-top-down" : ""}`}
       >
@@ -454,9 +586,28 @@ export default function HerdEvolution({
           </div>
         </div>
         <svg
-          className={`radial-canvas ${view === "radial" ? "network-radial" : "network-hierarchy"} ${dragging ? "is-dragging" : ""}`}
+          className={`radial-canvas ${view === "radial" ? "network-radial" : "network-hierarchy"} ${dragging ? "is-dragging" : ""} ${wheeling ? "is-wheeling" : ""}`}
           viewBox="0 0 1000 680"
           ref={svgRef}
+          tabIndex={0}
+          aria-keyshortcuts="+ - 0"
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === "+" || e.key === "=") {
+              e.preventDefault();
+              changeZoom(1.25);
+            }
+            if (e.key === "-") {
+              e.preventDefault();
+              changeZoom(1 / 1.25);
+            }
+            if (e.key === "0") {
+              e.preventDefault();
+              cameraRef.current = camera;
+              setZoom(camera.zoom);
+              setPan(camera.pan);
+            }
+          }}
           role="group"
           aria-label={`Rede do rebanho em ${snapshot.year}: ${decimal(snapshot.herd)} cabeças. Selecione um integrante para ver os detalhes.`}
           onPointerDown={beginDrag}
@@ -472,7 +623,7 @@ export default function HerdEvolution({
             }}
           >
             {branches
-              .filter((b) => !focusedOwner || b.person.id === focusedOwner)
+              .filter((b) => visibleOwners.has(b.person.id))
               .map(({ person, count, branch, color, radius, leaves }) => {
                 return (
                   <g
@@ -724,27 +875,27 @@ export default function HerdEvolution({
         )}
         <div className="radial-canvas-bottom">
           <span>
-            <TinyCow /> Linhas contínuas: mãe → cria · tracejadas: participante
+            <TinyCow /> Role para ampliar · arraste para mover ·{" "}
+            {Math.round(zoom * viewportScale * 100)}%
           </span>
           <div className="radial-zoom">
             <button
               aria-label="Diminuir zoom do grafo"
-              disabled={zoom <= 0.01}
-              onClick={() => setZoom(Math.max(0.01, zoom / 1.25))}
+              disabled={zoom <= 0.05}
+              onClick={() => changeZoom(1 / 1.25)}
             >
               <Minus size={15} />
             </button>
             <button
               aria-label="Aumentar zoom do grafo"
-              disabled={zoom >= 2.5}
-              onClick={() => setZoom(Math.min(2.5, zoom * 1.25))}
+              disabled={zoom >= 8}
+              onClick={() => changeZoom(1.25)}
             >
               <Plus size={15} />
             </button>
             <button
-              aria-label={
-                focusedOwner ? "Enquadrar seleção" : "Enquadrar todo o grafo"
-              }
+              aria-label="Restaurar enquadramento legível"
+              title="Restaurar visão"
               onClick={() => {
                 setZoom(camera.zoom);
                 setPan(camera.pan);

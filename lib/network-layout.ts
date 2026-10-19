@@ -84,3 +84,37 @@ export function focusViewport(
     },
   };
 }
+
+export function readableViewport(
+  points: Point[],
+  minZoom = 0.9,
+  maxZoom = 1.8,
+) {
+  const fit = focusViewport(points, Math.max(minZoom, maxZoom));
+  if (!points.length || fit.zoom >= minZoom) return fit;
+  const minX = Math.min(...points.map((p) => p.x)),
+    maxX = Math.max(...points.map((p) => p.x));
+  const minY = Math.min(...points.map((p) => p.y));
+  return {
+    zoom: minZoom,
+    pan: {
+      x: minZoom * (500 - (minX + maxX) / 2),
+      y: 100 - 340 - minZoom * (minY - 340),
+    },
+  };
+}
+export function zoomAt(
+  camera: { zoom: number; pan: Point },
+  requested: number,
+  anchor: Point,
+) {
+  const zoom = Math.max(0.05, Math.min(8, requested));
+  const ratio = zoom / camera.zoom;
+  return {
+    zoom,
+    pan: {
+      x: anchor.x - 500 - ratio * (anchor.x - 500 - camera.pan.x),
+      y: anchor.y - 340 - ratio * (anchor.y - 340 - camera.pan.y),
+    },
+  };
+}

@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { genealogyNodes, familyIds, genealogyLayout } from "./genealogy.ts";
+import {
+  genealogyNodes,
+  familyIds,
+  genealogyLayout,
+  paginateFamilies,
+} from "./genealogy.ts";
 import {
   defaultSettings,
   projectOwnership,
@@ -152,4 +157,55 @@ test("different mothers and birth years never get merged, including a large herd
     "a",
   );
   assert.equal(orphan[0].motherId, undefined);
+});
+
+test("large herds are paged without splitting families or losing any roots", () => {
+  const herd = Array.from({ length: 90 }, (_, i) =>
+    cohort(`mother-${i}`, { owner: i % 2 ? "b" : "a" }),
+  );
+  const history = {
+    2026: herd,
+    2027: [
+      ...herd,
+      cohort("calf", {
+        motherId: "mother-0",
+        animalId: undefined,
+        birthYear: 2027,
+        ageMonths: 1,
+      }),
+    ],
+  };
+  const nodes = [
+    ...genealogyNodes(history, 2027, "a"),
+    ...genealogyNodes(history, 2027, "b"),
+  ];
+  const seen = new Set<string>();
+  for (let i = 0; i < 15; i++) {
+    const page = paginateFamilies(nodes, null, i);
+    assert.equal(page.pageCount, 15);
+    const roots = [...page.ids].filter((id) => id.startsWith("mother-"));
+    assert.equal(roots.length, 6);
+    for (const id of roots) {
+      assert.ok(!seen.has(id));
+      seen.add(id);
+    }
+    if (page.ids.has("mother-0")) assert.ok(page.ids.has("calf"));
+  }
+  assert.equal(seen.size, 90);
+  assert.equal(paginateFamilies(nodes, "a", 999).currentPage, 7);
+  const initial = paginateFamilies(nodes, null, 0);
+  assert.ok([...initial.ids].some((id) => id === "mother-1"));
+});
+test("unrelated families wrap into rows rather than a single unbounded strip", () => {
+  const nodes = genealogyNodes(
+    { 2026: Array.from({ length: 90 }, (_, i) => cohort(`mother-${i}`)) },
+    2026,
+    "a",
+  );
+  const points = [...genealogyLayout(nodes).values()];
+  assert.ok(new Set(points.map((p) => p.y)).size > 1);
+  assert.ok(
+    Math.max(...points.map((p) => p.x)) - Math.min(...points.map((p) => p.x)) <
+      900,
+  );
 });

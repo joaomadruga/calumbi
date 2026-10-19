@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ownerPosition, cowPosition, focusViewport } from "./network-layout.ts";
+import {
+  ownerPosition,
+  cowPosition,
+  focusViewport,
+  readableViewport,
+  zoomAt,
+} from "./network-layout.ts";
 const near = (a: number, b: number) =>
   assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 
@@ -59,4 +65,29 @@ test("radial layouts give a large genealogy distinct positions beyond the origin
   assert.ok(
     positions.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)),
   );
+});
+
+test("readable framing never shrinks a large tree below the readability floor", () => {
+  const points = [
+    { x: -5000, y: 200 },
+    { x: 5000, y: 2000 },
+  ];
+  const camera = readableViewport(points, 0.95, 1.6);
+  assert.equal(camera.zoom, 0.95);
+  near(340 + camera.pan.y + camera.zoom * (200 - 340), 100);
+  const single = readableViewport([{ x: 500, y: 340 }], 0.95, 1.6);
+  assert.equal(single.zoom, 1.6);
+});
+test("wheel zoom keeps the world point beneath the cursor fixed, at any pan", () => {
+  const camera = { zoom: 0.75, pan: { x: 120, y: -40 } },
+    cursor = { x: 730, y: 225 };
+  const world = {
+    x: 500 + (cursor.x - 500 - camera.pan.x) / camera.zoom,
+    y: 340 + (cursor.y - 340 - camera.pan.y) / camera.zoom,
+  };
+  const next = zoomAt(camera, 1.5, cursor);
+  near(500 + next.pan.x + next.zoom * (world.x - 500), cursor.x);
+  near(340 + next.pan.y + next.zoom * (world.y - 340), cursor.y);
+  assert.equal(zoomAt(camera, 999, cursor).zoom, 8);
+  assert.equal(zoomAt(camera, 0.001, cursor).zoom, 0.05);
 });

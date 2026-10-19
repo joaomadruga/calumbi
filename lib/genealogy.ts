@@ -126,9 +126,60 @@ export function genealogyLayout(
     cursor += 0.5;
   }
   for (const node of nodes) if (!points.has(node.sourceIds[0])) place(node, 0);
+  // Pack independent families into rows, rather than one enormous horizontal forest.
+  let rowX = 0,
+    rowY = 0,
+    rowHeight = 0;
+  for (const root of roots) {
+    const ids = familyIds(nodes, root.sourceIds[0]);
+    const family = [...ids].map((id) => points.get(id)!).filter(Boolean);
+    if (!family.length) continue;
+    const minX = Math.min(...family.map((p) => p.x)),
+      maxX = Math.max(...family.map((p) => p.x));
+    const minY = Math.min(...family.map((p) => p.y)),
+      maxY = Math.max(...family.map((p) => p.y));
+    const width = maxX - minX + gap,
+      height = maxY - minY + 120;
+    if (rowX && rowX + width > 850) {
+      rowX = 0;
+      rowY += rowHeight + 70;
+      rowHeight = 0;
+    }
+    for (const id of ids) {
+      const p = points.get(id);
+      if (p)
+        points.set(id, { ...p, x: rowX + p.x - minX, y: rowY + p.y - minY });
+    }
+    rowX += width + 35;
+    rowHeight = Math.max(rowHeight, height);
+  }
   const xs = [...points.values()].map((p) => p.x);
   const mid = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 0;
   return new Map(
     [...points].map(([id, point]) => [id, { ...point, x: point.x - mid }]),
   );
+}
+
+export function paginateFamilies(
+  nodes: GenealogyNode[],
+  owner: string | null,
+  page: number,
+  size = 6,
+) {
+  const grouped = new Map<string, GenealogyNode[]>();
+  for (const node of nodes)
+    if (!node.motherId && (!owner || node.owner === owner))
+      grouped.set(node.owner, [...(grouped.get(node.owner) ?? []), node]);
+  const groups = [...grouped.values()];
+  const roots = Array.from(
+    { length: Math.max(0, ...groups.map((g) => g.length)) },
+    (_, i) => groups.flatMap((g) => (g[i] ? [g[i]] : [])),
+  ).flat();
+  const pageCount = Math.max(1, Math.ceil(roots.length / size));
+  const currentPage = Math.max(0, Math.min(page, pageCount - 1));
+  const pageRoots = roots.slice(currentPage * size, (currentPage + 1) * size);
+  const ids = new Set(
+    pageRoots.flatMap((root) => [...familyIds(nodes, root.sourceIds[0])]),
+  );
+  return { roots, pageCount, currentPage, ids };
 }
