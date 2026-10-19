@@ -10,6 +10,7 @@ import { active, decimal, type Farm } from "@/lib/model";
 import {
   simulateInvestment,
   type SandboxInput,
+  type SandboxPurchase,
 } from "@/lib/investment-sandbox";
 import WeightField from "./weight-field";
 import HerdEvolution from "./herd-evolution";
@@ -24,9 +25,14 @@ const colors = ["#a8b6a3", "#bc8b54", "#38564a"];
 export default function InvestmentSandbox({ farm }: { farm: Farm }) {
   const defaults = (): SandboxInput => ({
     purchases: farm.investors.map((p) => ({
+      id: `lot-${p.id}`,
       owner: p.id,
       quantity: 0,
       unitPrice: 0,
+      ageMonths: 18,
+      weight: 15000 / farm.settings.yield,
+      breedingWeightKg: 15000 / farm.settings.yield,
+      pregnant: false,
     })),
     cowAgeMonths: 36,
     cowWeight: 0,
@@ -58,11 +64,6 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
   const [revision, setRevision] = useState(0);
   const [stageId, setStageId] = useState("bull");
   const [owner, setOwner] = useState("all");
-  const cowWeight = useCallback(
-    (kg: number) =>
-      setDraft((p) => (p.cowWeight === kg ? p : { ...p, cowWeight: kg })),
-    [],
-  );
   const bullWeight = useCallback(
     (kg: number) =>
       setDraft((p) =>
@@ -85,17 +86,26 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
   const selected =
     result?.stages.find((s) => s.id === stageId) ?? result?.stages.at(-1);
   const dirty = applied && JSON.stringify(applied) !== JSON.stringify(draft);
-  const setPurchase = (
-    id: string,
-    key: "quantity" | "unitPrice",
-    value: number,
-  ) =>
-    setDraft((p) => ({
-      ...p,
-      purchases: p.purchases.map((row) =>
-        row.owner === id ? { ...row, [key]: value } : row,
-      ),
-    }));
+  const setPurchase = useCallback(
+    (id: string, patch: Partial<SandboxPurchase>) =>
+      setDraft((p) => {
+        const row = p.purchases.find((row) => row.id === id);
+        if (
+          !row ||
+          Object.entries(patch).every(
+            ([key, value]) => row[key as keyof SandboxPurchase] === value,
+          )
+        )
+          return p;
+        return {
+          ...p,
+          purchases: p.purchases.map((row) =>
+            row.id === id ? { ...row, ...patch } : row,
+          ),
+        };
+      }),
+    [],
+  );
   const sales = (key: string, value: number | string) =>
     setDraft((p) => ({ ...p, sales: { ...p.sales!, [key]: value } }));
   const bull = (key: string, value: number | string | boolean) =>
@@ -124,109 +134,81 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
           </span>
           <h2>Quem quer comprar mais gado?</h2>
           <p className="muted">
-            Informe a quantidade e o preço negociado por vaca. Use zero para
-            quem não for comprar.
+            Adicione quantos lotes precisar para cada participante. Cada lote
+            tem seu próprio peso, idade, preço e início da reprodução. As fêmeas
+            compradas ficam para formar matrizes; suas crias seguem a venda
+            anual do teste.
           </p>
-          <div className="sandbox-orders">
-            {draft.purchases.map((row) => {
-              const p = farm.investors.find((p) => p.id === row.owner)!;
-              return (
-                <div className="sandbox-order" key={p.id}>
-                  <div className="sandbox-person">
-                    <i style={{ background: p.color }} />
-                    <span>
-                      <strong>{p.name}</strong>
-                      <small>
-                        {active(farm).filter((a) => a.owner === p.id).length}{" "}
-                        animais cadastrados hoje
-                      </small>
-                    </span>
-                  </div>
-                  <label className="field">
-                    <span>Quantas vacas?</span>
-                    <input
-                      aria-label={`Quantidade de vacas para ${p.name}`}
-                      type="number"
-                      min="0"
-                      max="500"
-                      step="1"
-                      required
-                      value={row.quantity}
-                      onChange={(e) =>
-                        setPurchase(p.id, "quantity", Number(e.target.value))
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Preço por vaca (R$)</span>
-                    <input
-                      aria-label={`Preço por vaca para ${p.name}`}
-                      type="number"
-                      min={row.quantity ? ".01" : "0"}
-                      max="100000000"
-                      step=".01"
-                      required
-                      value={row.unitPrice || ""}
-                      placeholder="Valor negociado"
-                      onChange={(e) =>
-                        setPurchase(p.id, "unitPrice", Number(e.target.value))
-                      }
-                      disabled={!row.quantity}
-                    />
-                  </label>
-                  <strong className="sandbox-order-total">
-                    {cash(row.quantity * row.unitPrice)}
-                  </strong>
-                </div>
-              );
-            })}
-          </div>
+          {farm.investors.map((person) => (
+            <div key={person.id} className="sandbox-orders">
+              <div className="sandbox-person">
+                <i style={{ background: person.color }} />
+                <span>
+                  <strong>{person.name}</strong>
+                  <small>
+                    {active(farm).filter((a) => a.owner === person.id).length}{" "}
+                    animais cadastrados hoje
+                  </small>
+                </span>
+              </div>
+              {draft.purchases
+                .filter((row) => row.owner === person.id)
+                .map((row, index) => (
+                  <PurchaseLot
+                    key={row.id + "-" + revision}
+                    row={row}
+                    index={index}
+                    yieldPercent={farm.settings.yield}
+                    update={setPurchase}
+                    remove={() =>
+                      setDraft((p) => ({
+                        ...p,
+                        purchases: p.purchases.filter(
+                          (lot) => lot.id !== row.id,
+                        ),
+                      }))
+                    }
+                  />
+                ))}
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() =>
+                  setDraft((p) => ({
+                    ...p,
+                    purchases: [
+                      ...p.purchases,
+                      {
+                        id: crypto.randomUUID(),
+                        owner: person.id,
+                        quantity: 0,
+                        unitPrice: 0,
+                        ageMonths: 18,
+                        weight: 15000 / farm.settings.yield,
+                        breedingWeightKg: 15000 / farm.settings.yield,
+                        pregnant: false,
+                      },
+                    ],
+                  }))
+                }
+              >
+                + Adicionar lote para {person.name}
+              </button>
+            </div>
+          ))}
           {!farm.investors.length && (
             <p className="form-note">
               Cadastre participantes na aba Participantes para começar.
             </p>
           )}
-          <div className="sandbox-form-grid">
-            <label className="field">
-              <span>Idade das vacas na compra (meses)</span>
-              <input
-                type="number"
-                min="12"
-                max="180"
-                step="1"
-                required
-                value={draft.cowAgeMonths}
-                onChange={(e) =>
-                  setDraft((p) => ({
-                    ...p,
-                    cowAgeMonths: Number(e.target.value),
-                  }))
-                }
-              />
-            </label>
-            <WeightField
-              key={`cow-${revision}`}
-              initialKg={draft.cowWeight}
-              yieldPercent={farm.settings.yield}
-              onWeightChange={cowWeight}
-            />
-            <label className="sandbox-check">
-              <input
-                type="checkbox"
-                checked={draft.pregnant}
-                onChange={(e) =>
-                  setDraft((p) => ({ ...p, pregnant: e.target.checked }))
-                }
-              />
-              <span>
-                As vacas já chegam prenhas
-                <small>
-                  A fase da gestação é desconhecida; considera-se o prazo
-                  completo configurado.
-                </small>
-              </span>
-            </label>
-          </div>
+          <p className="form-note">
+            Exemplo: um lote com 5 fêmeas de 6@ e outro com 10 fêmeas de 10@,
+            ambos com início de reprodução em 10@. O primeiro precisa crescer; o
+            segundo já pode iniciar a gestação. O peso para reprodução é uma
+            premissa sua, editável por lote. Idade e peso não confirmam
+            fertilidade. O prazo até atingir o peso usa o ganho diário informado
+            neste teste.
+          </p>
         </section>
         <section className="card sandbox-card">
           <span className="section-eyebrow">2 · BOIS COMPARTILHADOS</span>
@@ -922,5 +904,131 @@ function ReturnForecast({
         acima para ver seu retorno.
       </p>
     </section>
+  );
+}
+
+function PurchaseLot({
+  row,
+  index,
+  yieldPercent,
+  update,
+  remove,
+}: {
+  row: SandboxPurchase;
+  index: number;
+  yieldPercent: number;
+  update: (id: string, patch: Partial<SandboxPurchase>) => void;
+  remove: () => void;
+}) {
+  const onWeight = useCallback(
+    (weight: number) => update(row.id!, { weight }),
+    [row.id, update],
+  );
+  const minimumKg = row.breedingWeightKg ?? 15000 / yieldPercent;
+  const ready = (row.weight ?? 0) >= minimumKg;
+  return (
+    <div className="card sandbox-card">
+      <div className="sandbox-chart-heading">
+        <h3>Lote {index + 1} · Fêmeas para reprodução</h3>
+        <button type="button" className="button secondary" onClick={remove}>
+          Remover lote {index + 1}
+        </button>
+      </div>
+      <div className="sandbox-form-grid">
+        <label className="field">
+          <span>Quantidade de fêmeas</span>
+          <input
+            type="number"
+            min="0"
+            max="500"
+            step="1"
+            required
+            value={row.quantity}
+            onChange={(e) =>
+              update(row.id!, { quantity: Number(e.target.value) })
+            }
+          />
+        </label>
+        <label className="field">
+          <span>Preço por animal (R$)</span>
+          <input
+            type="number"
+            min={row.quantity ? ".01" : "0"}
+            max="100000000"
+            step=".01"
+            required={row.quantity > 0}
+            value={row.unitPrice || ""}
+            disabled={!row.quantity}
+            onChange={(e) =>
+              update(row.id!, { unitPrice: Number(e.target.value) })
+            }
+          />
+        </label>
+        <label className="field">
+          <span>Idade aproximada na compra (meses)</span>
+          <input
+            type="number"
+            min="1"
+            max="180"
+            step="1"
+            required
+            value={row.ageMonths}
+            onChange={(e) =>
+              update(row.id!, { ageMonths: Number(e.target.value) })
+            }
+          />
+        </label>
+        <WeightField
+          initialKg={row.weight}
+          initialUnit="arroba-carcaca"
+          required={row.quantity > 0}
+          yieldPercent={yieldPercent}
+          onWeightChange={onWeight}
+        />
+        <label className="field">
+          <span>Iniciar reprodução com (@ de carcaça)</span>
+          <input
+            type="number"
+            min=".1"
+            max={(450 * yieldPercent) / 1500}
+            step="any"
+            required
+            value={Number(((minimumKg * yieldPercent) / 1500).toFixed(6))}
+            onChange={(e) =>
+              update(row.id!, {
+                breedingWeightKg:
+                  (Number(e.target.value) * 1500) / yieldPercent,
+              })
+            }
+          />
+          <small>
+            {decimal(minimumKg)} kg vivos com rendimento de{" "}
+            {decimal(yieldPercent)}%.
+          </small>
+        </label>
+        <label className="sandbox-check">
+          <input
+            type="checkbox"
+            checked={row.pregnant ?? false}
+            onChange={(e) => update(row.id!, { pregnant: e.target.checked })}
+          />
+          <span>
+            Já chegam prenhas
+            <small>
+              Considera o prazo completo de gestação, pois a fase é
+              desconhecida.
+            </small>
+          </span>
+        </label>
+      </div>
+      <p>
+        <strong>{cash(row.quantity * row.unitPrice)}</strong> ·{" "}
+        {row.pregnant
+          ? "Prenhez informada"
+          : ready
+            ? "Já atingiu o peso informado para iniciar a reprodução"
+            : "Vai crescer até o peso informado antes de iniciar a reprodução"}
+      </p>
+    </div>
   );
 }

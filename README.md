@@ -127,7 +127,7 @@ Essa reconstrução ocorre em memória: não cadastra crias, não escreve no Goo
 
 Abra **Testes** no menu (`/?section=tests`) para simular, sem gravar dados:
 
-1. Quantidade e preço unitário de vacas para cada participante. Idade, peso vivo em kg/@ e prenhez são premissas comuns às novas vacas.
+1. Vários lotes de fêmeas por participante, com quantidade, preço unitário, idade, peso em kg/@, prenhez e peso de início de reprodução independentes. Use **Adicionar lote** para misturar categorias na mesma compra.
 2. Opcionalmente, um lote de 1 a 500 bois compartilhados: quantidade, preço por animal, peso e idade por animal, finalidade de reprodução ou engorda e divisão igual ou proporcional às cotas após comprar as vacas.
 3. Custo por cabeça, custo fixo mensal e horizonte de 1 a 15 anos, somente para este teste.
 
@@ -142,8 +142,17 @@ As compras são financiadas pelos aportes iniciais exibidos no resultado, sem co
 
 Após calcular, o teste mostra também o grafo genealógico do cenário selecionado, com anos e filtro por participante. O quadro de retorno segue o mesmo cenário e filtro.
 
-A venda ocorre uma vez a cada período futuro de 12 meses: todas as crias elegíveis, de ambos os sexos, são vendidas a partir de 6@. Não há retenção de fêmeas para reposição neste cenário. Matrizes existentes permanecem até descarte ou venda adicional por lotação; reprodutores são preservados. A lotação máxima é editável e nunca autoriza vender abaixo de 6@: excessos impossíveis de resolver são exibidos na tabela.
+A venda ocorre uma vez a cada período futuro de 12 meses: todas as crias elegíveis, de ambos os sexos, são vendidas a partir de 6@. Não há retenção de fêmeas para reposição neste cenário. Fêmeas compradas para formar matrizes também permanecem; matrizes existentes ficam até descarte ou venda adicional por lotação; reprodutores são preservados. A lotação máxima é editável e nunca autoriza vender abaixo de 6@: excessos impossíveis de resolver são exibidos na tabela.
 
 Premissas editáveis: bezerro R$450/@, novilha R$370/@ (ponto médio da faixa R$350–390 informada), retenção de 10% de cada venda para o caixa, ganho diário de 0,5 kg e base da arroba (carcaça ou peso vivo). A base inicial é carcaça: kg vivo × rendimento ÷ 15; com rendimento de 50%, 6@ são 180 kg vivos. O ganho é aproximado, comum aos animais, limitado aos pesos máximos do modelo. Fêmeas de 12 a 35 meses usam o preço de novilha; machos até 23 meses e fêmeas abaixo de 12 meses usam o de bezerro. Adultos usam a arroba da fazenda. Preços permanecem constantes; os custos seguem a inflação cadastrada.
 
 A receita bruta é dividida em caixa retido e distribuição ao dono dos animais vendidos. Somente a parcela retida entra no caixa e financia despesas e reservas; o restante dos custos exige aporte. O saldo de dinheiro acumulado deduz compras do teste e aportes futuros das distribuições. A taxa de retorno em caixa usa como base o valor estimado do rebanho inicial mais compras e aportes; não é uma TIR nem inclui liquidação do patrimônio final, impostos ou taxas. Inferências anteriores à data do teste continuam seguindo as premissas históricas da aba Projeções e não geram dinheiro real.
+
+
+### Lotes com fases de reprodução diferentes
+
+Cada participante pode comprar, por exemplo, um lote de 5 fêmeas de 6@ e outro de 10 fêmeas de 10@. Cada lote possui peso e idade próprios, e o campo **Iniciar reprodução com (@ de carcaça)** começa em 10@, como premissa editável do teste. Com rendimento de 50%, os pesos são respectivamente 180 e 300 kg vivos; o seletor de peso permite escolher outra base.
+
+Para esses lotes, a primeira gestação começa depois de atingir o peso informado, usando o ganho diário do cenário: dias de espera = máximo(0, peso de reprodução − peso atual) ÷ ganho diário. A primeira cria chega após essa espera mais os dias de gestação. Se a prenhez já foi informada, não há espera por crescimento; considera-se o prazo completo de gestação. As próximas crias usam o intervalo entre partos cadastrado. A idade serve para o grafo, mortalidade e descarte; o peso de reprodução informado por lote substitui a idade genérica de primeira concepção apenas nessas compras. Não é uma confirmação biológica de fertilidade.
+
+As fêmeas de reposição compradas não são revendidas automaticamente como crias, mesmo quando jovens: permanecem para reprodução. Seus descendentes seguem a venda anual a partir de 6@. Lotação e descarte ainda podem exigir venda das matrizes. Custos, cotas, rateio dos bois e retorno somam todos os lotes de cada proprietário; IDs de animais simulados são únicos mesmo com vários lotes para a mesma pessoa.

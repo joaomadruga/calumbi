@@ -304,3 +304,149 @@ test("annual sale settings belong only to the test and invalid policies are reje
       ),
     );
 });
+
+test("same owner can buy separate 6@ and 10@ lots with independent reproduction and costs", () => {
+  const f = farm();
+  f.animals = [];
+  f.settings.birthRate = 100;
+  const config = input();
+  config.bull.enabled = false;
+  config.purchases = [
+    {
+      id: "young",
+      owner: "a",
+      quantity: 5,
+      unitPrice: 2700,
+      ageMonths: 7,
+      weight: 180,
+      breedingWeightKg: 300,
+      pregnant: false,
+    },
+    {
+      id: "ready",
+      owner: "a",
+      quantity: 10,
+      unitPrice: 4500,
+      ageMonths: 18,
+      weight: 300,
+      breedingWeightKg: 300,
+      pregnant: false,
+    },
+  ];
+  config.sales = {
+    capacity: 1000,
+    calfPrice: 450,
+    heiferPrice: 370,
+    retainedPercent: 10,
+    minimumArrobas: 6,
+    arrobaBasis: "carcass",
+    dailyGain: 0.5,
+  };
+  const before = JSON.stringify(config);
+  const result = simulateInvestment(f, config, now);
+  assert.equal(result.quantity, 15);
+  assert.equal(result.cowsCost, 58500);
+  const stage = result.stages[1];
+  assert.equal(stage.people[0].added, 15);
+  assert.equal(stage.people[0].cowsInvestment, 58500);
+  const initial = stage.plan.cohortsByYear[2026];
+  assert.equal(new Set(initial.map((c) => c.id)).size, 15);
+  assert.equal(initial.filter((c) => c.ageMonths === 7).length, 5);
+  assert.equal(initial.filter((c) => c.ageMonths === 18).length, 10);
+  const youngIds = initial.filter((c) => c.ageMonths === 7).map((c) => c.id);
+  const readyIds = initial.filter((c) => c.ageMonths === 18).map((c) => c.id);
+  near(stage.plan.total[1].births, 10);
+  assert.ok(
+    !stage.plan.cohortsByYear[2027].some(
+      (c) => c.motherId && youngIds.includes(c.motherId),
+    ),
+  );
+  assert.ok(
+    stage.plan.cohortsByYear[2027].some(
+      (c) => c.motherId && readyIds.includes(c.motherId),
+    ),
+  );
+  assert.ok(
+    stage.plan.cohortsByYear[2028].some(
+      (c) => c.motherId && youngIds.includes(c.motherId),
+    ),
+  );
+  for (const year of [2027, 2028, 2029])
+    near(
+      stage.plan.cohortsByYear[year]
+        .filter((c) => youngIds.includes(c.id) || readyIds.includes(c.id))
+        .reduce((n, c) => n + c.count, 0),
+      15,
+    );
+  assert.equal(JSON.stringify(config), before);
+  near(result.stages[0].plan.total[1].births, 0);
+});
+test("lot breeding weight overrides generic maturity, while pregnancy bypasses weight waiting", () => {
+  const f = farm();
+  f.animals = [];
+  f.settings.birthRate = 100;
+  f.settings.maturityMonths = 36;
+  const config = input();
+  config.bull.enabled = false;
+  config.purchases = [
+    {
+      id: "one",
+      owner: "a",
+      quantity: 1,
+      unitPrice: 2700,
+      ageMonths: 7,
+      weight: 180,
+      breedingWeightKg: 300,
+      pregnant: false,
+    },
+  ];
+  config.sales = {
+    capacity: 1000,
+    calfPrice: 450,
+    heiferPrice: 370,
+    retainedPercent: 10,
+    minimumArrobas: 6,
+    arrobaBasis: "carcass",
+    dailyGain: 0.5,
+  };
+  near(simulateInvestment(f, config, now).stages[1].plan.total[1].births, 0);
+  config.purchases[0].breedingWeightKg = 180;
+  near(simulateInvestment(f, config, now).stages[1].plan.total[1].births, 1);
+  config.purchases[0].breedingWeightKg = 300;
+  config.purchases[0].pregnant = true;
+  near(simulateInvestment(f, config, now).stages[1].plan.total[1].births, 1);
+});
+test("lot identifiers and independent weights and ages are validated", () => {
+  const config = input();
+  const lot = {
+    id: "first",
+    owner: "a",
+    quantity: 1,
+    unitPrice: 1000,
+    ageMonths: 7,
+    weight: 180,
+    breedingWeightKg: 300,
+  };
+  for (const patch of [
+    { ageMonths: 0 },
+    { ageMonths: 1.5 },
+    { weight: 0 },
+    { weight: NaN },
+    { breedingWeightKg: 0 },
+    { breedingWeightKg: 451 },
+  ])
+    assert.throws(() =>
+      simulateInvestment(
+        farm(),
+        { ...config, purchases: [{ ...lot, ...patch }] },
+        now,
+      ),
+    );
+  assert.throws(() =>
+    simulateInvestment(
+      farm(),
+      { ...config, purchases: [lot, { ...lot, owner: "b" }] },
+      now,
+    ),
+  );
+});

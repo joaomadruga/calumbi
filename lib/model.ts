@@ -178,10 +178,15 @@ export type AnnualSalePolicy = {
   arrobaBasis: "live" | "carcass";
   dailyGain: number;
 };
+export type PurchaseProjection = {
+  clocks: Record<string, number>;
+  retainedFemales: string[];
+};
 export type ProjectionInference = {
   seeds: (ProjectedCohort & { weight: number })[];
   clocks: Record<string, number>;
   birthsByOwner: Record<string, number>;
+  retainedFemales?: string[];
 };
 
 /** One shared herd simulation. Every cohort retains its owner's identity. */
@@ -242,7 +247,9 @@ export function projectOwnership(
     birthEstimated: !!a.details && a.details.birthSource !== "known",
     sex: a.sex,
     age: ageMonths(a.born, now),
-    annualSale: ageMonths(a.born, now) < 12,
+    annualSale:
+      ageMonths(a.born, now) < 12 &&
+      !inference?.retainedFemales?.includes(a.id),
     count: 1,
     weight: a.weight,
     owner: a.owner,

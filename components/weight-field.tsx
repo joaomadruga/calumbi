@@ -3,15 +3,32 @@ import { useState, useEffect } from "react";
 import { weightInKg, weightLabel, type WeightUnit } from "@/lib/weight";
 export default function WeightField({
   initialKg = 0,
+  initialUnit = "kg",
+  required = false,
   yieldPercent,
   onWeightChange,
 }: {
   initialKg?: number;
+  initialUnit?: WeightUnit;
+  required?: boolean;
   yieldPercent: number;
   onWeightChange?: (kg: number) => void;
 }) {
-  const [value, setValue] = useState(initialKg ? String(initialKg) : "");
-  const [unit, setUnit] = useState<WeightUnit>("kg");
+  const [value, setValue] = useState(
+    initialKg
+      ? String(
+          Number(
+            (initialUnit === "kg"
+              ? initialKg
+              : initialUnit === "arroba-vivo"
+                ? initialKg / 15
+                : (initialKg * yieldPercent) / 100 / 15
+            ).toFixed(6),
+          ),
+        )
+      : "",
+  );
+  const [unit, setUnit] = useState<WeightUnit>(initialUnit);
   const kg =
     value && Number.isFinite(Number(value)) && Number(value) > 0
       ? weightInKg(Number(value), unit, yieldPercent)
@@ -21,7 +38,7 @@ export default function WeightField({
   }, [kg, onWeightChange]);
   return (
     <label className="field">
-      <span>Peso por animal (opcional)</span>
+      <span>{required ? "Peso por animal" : "Peso por animal (opcional)"}</span>
       <select
         aria-label="Unidade e tipo de peso"
         value={unit}
@@ -50,6 +67,7 @@ export default function WeightField({
       <input
         aria-label="Peso por animal"
         type="number"
+        required={required}
         min="0.001"
         step="any"
         value={value}

@@ -5,6 +5,7 @@ import {
   normalizeSettings,
   projectOwnership,
   type Farm,
+  type PurchaseProjection,
   type AnnualSalePolicy,
   type ProjectedCohort,
   type ProjectionInference,
@@ -28,6 +29,7 @@ export function projectFromPurchases(
   purchaseAges: Record<number, number> = {},
   additionalSeeds: ProjectionInference["seeds"] = [],
   salePolicy?: AnnualSalePolicy,
+  purchaseProjection?: PurchaseProjection,
 ) {
   // Farm-specific purchase memories are optional and affect only the simulation.
   const f: Farm = {
@@ -206,7 +208,8 @@ export function projectFromPurchases(
     now,
     {
       seeds,
-      clocks,
+      clocks: { ...clocks, ...purchaseProjection?.clocks },
+      retainedFemales: purchaseProjection?.retainedFemales,
       birthsByOwner,
     },
     salePolicy,

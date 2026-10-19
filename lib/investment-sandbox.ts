@@ -2,14 +2,25 @@ import {
   active,
   normalizeSettings,
   type Farm,
+  type PurchaseProjection,
   type AnnualSalePolicy,
   type Animal,
   type ProjectionInference,
 } from "./model.ts";
 import { birthFromAge } from "./animal-age.ts";
 import { projectFromPurchases } from "./inferred-projection.ts";
+export type SandboxPurchase = {
+  id?: string;
+  owner: string;
+  quantity: number;
+  unitPrice: number;
+  ageMonths?: number;
+  weight?: number;
+  pregnant?: boolean;
+  breedingWeightKg?: number;
+};
 export type SandboxInput = {
-  purchases: { owner: string; quantity: number; unitPrice: number }[];
+  purchases: SandboxPurchase[];
   cowAgeMonths: number;
   cowWeight: number;
   pregnant: boolean;
@@ -51,9 +62,25 @@ export function simulateInvestment(
   let cowsCost = 0,
     quantity = 0;
   for (const p of input.purchases) {
-    if (seen.has(p.owner) || !farm.investors.some((i) => i.id === p.owner))
-      throw new Error("Participante inválido ou repetido.");
-    seen.add(p.owner);
+    const lotKey = p.id ?? p.owner;
+    if (
+      !lotKey ||
+      seen.has(lotKey) ||
+      !farm.investors.some((i) => i.id === p.owner)
+    )
+      throw new Error("Participante inválido ou lote repetido.");
+    seen.add(lotKey);
+    number(p.ageMonths ?? input.cowAgeMonths, "a idade do lote", 1, 180);
+    if (!Number.isInteger(p.ageMonths ?? input.cowAgeMonths))
+      throw new Error("Use meses inteiros para o lote.");
+    number(
+      p.weight ?? input.cowWeight,
+      "o peso do lote",
+      p.quantity && p.breedingWeightKg !== undefined ? 0.01 : 0,
+      1500,
+    );
+    if (p.breedingWeightKg !== undefined)
+      number(p.breedingWeightKg, "o peso para reprodução", 1, 450);
     number(p.quantity, "a quantidade", 0, 500);
     if (!Number.isInteger(p.quantity))
       throw new Error("A quantidade precisa ser inteira.");
@@ -93,26 +120,44 @@ export function simulateInvestment(
     ...(input.sales ? { capacity: input.sales.capacity } : {}),
   };
   const date = now.toISOString().slice(0, 10);
-  const additions: Animal[] = input.purchases.flatMap((p) =>
+  const purchaseProjection: PurchaseProjection = {
+    clocks: {},
+    retainedFemales: [],
+  };
+  const additions: Animal[] = input.purchases.flatMap((p, lotIndex) =>
     Array.from({ length: p.quantity }, (_, i) => ({
-      id: `simulation-cow-${p.owner}-${i}`,
+      id: `simulation-cow-${p.owner}-${lotIndex}-${i}`,
       tag: "",
       sex: "F" as const,
-      born: birthFromAge(input.cowAgeMonths, date),
-      weight: input.cowWeight,
+      born: birthFromAge(p.ageMonths ?? input.cowAgeMonths, date),
+      weight: p.weight ?? input.cowWeight,
       owner: p.owner,
       status: "ativo" as const,
       details: {
         birthSource: "estimated" as const,
-        estimatedMonths: input.cowAgeMonths,
+        estimatedMonths: p.ageMonths ?? input.cowAgeMonths,
         ageReferenceDate: date,
         acquiredAt: date,
-        reproductiveStatus: input.pregnant
-          ? ("pregnant" as const)
-          : ("unknown" as const),
+        reproductiveStatus:
+          (p.pregnant ?? input.pregnant)
+            ? ("pregnant" as const)
+            : ("unknown" as const),
       },
     })),
   );
+  input.purchases.forEach((p, lotIndex) => {
+    if (p.breedingWeightKg === undefined) return;
+    for (let i = 0; i < p.quantity; i++) {
+      const id = `simulation-cow-${p.owner}-${lotIndex}-${i}`;
+      const waitDays =
+        (p.pregnant ?? input.pregnant)
+          ? 0
+          : Math.max(0, p.breedingWeightKg - (p.weight ?? input.cowWeight)) /
+            (input.sales?.dailyGain ?? 90 / 365.25);
+      purchaseProjection.clocks[id] = waitDays + settings.gestationDays;
+      purchaseProjection.retainedFemales.push(id);
+    }
+  });
   const bullQuantity = input.bull.enabled ? input.bull.quantity : 0;
   const originalHeads = active(farm).length;
   const afterCowHeads = originalHeads + additions.length;
@@ -126,8 +171,8 @@ export function simulateInvestment(
     );
   const ownership = farm.investors.map((p) => {
     const before = active(farm).filter((a) => a.owner === p.id).length;
-    const purchase = input.purchases.find((a) => a.owner === p.id);
-    const added = purchase?.quantity ?? 0;
+    const purchases = input.purchases.filter((a) => a.owner === p.id);
+    const added = purchases.reduce((n, a) => n + a.quantity, 0);
     const afterCows = before + added;
     const bullShare = input.bull.enabled
       ? input.bull.split === "equal"
@@ -142,7 +187,10 @@ export function simulateInvestment(
       bullShare,
       afterBull: afterCows + bullQuantity * bullShare,
       cowsInvestment:
-        (added * Math.round((purchase?.unitPrice ?? 0) * 100)) / 100,
+        purchases.reduce(
+          (n, a) => n + a.quantity * Math.round(a.unitPrice * 100),
+          0,
+        ) / 100,
       bullInvestment: 0,
     };
   });
@@ -223,6 +271,7 @@ export function simulateInvestment(
       { 2023: 24, 2025: 36 },
       stage.extra,
       input.sales,
+      stage.id === "baseline" ? undefined : purchaseProjection,
     );
     return {
       id: stage.id,
