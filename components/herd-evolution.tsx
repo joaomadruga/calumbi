@@ -81,7 +81,7 @@ export default function HerdEvolution({
   const [focusedOwner, setFocusedOwner] = useState<string | null>(
     participants.length === 1 ? participants[0].id : null,
   );
-  const [view, setView] = useState<NetworkView>("radial");
+  const [view, setView] = useState<NetworkView>("top-down");
   const [zoom, setZoom] = useState(1);
   const [selectedPart, setSelectedPart] = useState(0);
   const [focusRevision, setFocusRevision] = useState(0);
