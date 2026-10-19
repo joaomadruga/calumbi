@@ -63,6 +63,7 @@ import {
   animalValue,
 } from "@/lib/model";
 import { applyAction, validateAction } from "@/lib/actions";
+import { projectFromPurchases } from "@/lib/inferred-projection";
 import AnimalBioFields from "./animal-bio-fields";
 import AnimalEditor from "./animal-editor";
 import { weightLabel } from "@/lib/weight";
@@ -242,6 +243,10 @@ export default function Dashboard({
     };
   }, [modal, busy]);
   const stats = useMemo(() => (farm ? summary(farm) : null), [farm]);
+  const actualHerdPlan = useMemo(
+    () => (farm ? projectOwnership(farm, 0) : null),
+    [farm],
+  );
   const projectionPlan = useMemo(() => {
     if (!farm) return { total: [], byOwner: {}, cohortsByYear: {} };
     const s = { ...farm.settings };
@@ -255,7 +260,10 @@ export default function Dashboard({
       s.birthRate = Math.min(100, s.birthRate * 1.1);
       s.arroba *= 1.1;
     }
-    return projectOwnership({ ...farm, settings: s }, years);
+    return projectFromPurchases({ ...farm, settings: s }, years, new Date(), {
+      2023: 24,
+      2025: 36,
+    });
   }, [farm, years, scenario]);
   const projection = projectionPlan.total;
   const shownProjection =
@@ -809,6 +817,19 @@ export default function Dashboard({
                         </button>
                       </section>
                     </div>
+                    {actualHerdPlan && (
+                      <div className="overview-current-herd">
+                        <HerdEvolution
+                          actual
+                          data={actualHerdPlan.total}
+                          capacity={farm.settings.capacity}
+                          participants={stats.shares}
+                          participantData={actualHerdPlan.byOwner}
+                          cohortData={actualHerdPlan.cohortsByYear}
+                          adultMonths={farm.settings.maturityMonths}
+                        />
+                      </div>
+                    )}
                     <div className="overview-bottom">
                       <section className="card growth-card">
                         <CardHeading

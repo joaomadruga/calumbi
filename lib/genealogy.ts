@@ -7,6 +7,7 @@ export type GenealogyNode = CowNode & {
   historical: boolean;
   projected: boolean;
   birthEstimated: boolean;
+  inferred: boolean;
 };
 /** Add only ancestors needed by the living herd, never future animals or guessed mothers. */
 export function genealogyNodes(
@@ -53,6 +54,7 @@ export function genealogyNodes(
         historical,
         projected: !c.animalId,
         birthEstimated: !!c.birthEstimated,
+        inferred: !!c.inferred,
         motherId: c.motherId && needed.has(c.motherId) ? c.motherId : undefined,
         label:
           c.tag ||

@@ -6,6 +6,7 @@ import {
   demoFarm,
   summary,
   project,
+  projectOwnership,
   defaultSettings,
   animalValue,
 } from "./model.ts";
@@ -187,4 +188,28 @@ test("retention and capacity drive sales rather than silently dropping animals",
   near(p[1].sales, 2);
   near(p[1].herd, 2);
   assert.ok(p[1].revenue > 0);
+});
+
+test("overview graph contains only current active registered animals and no inferred or future births", () => {
+  const f = farm([
+    animal("mother"),
+    animal("calf", { born: "2026-06-01", owner: "b" }),
+    animal("sold", { status: "vendido" }),
+    animal("dead", { status: "morto" }),
+  ]);
+  const plan = projectOwnership(f, 0, now);
+  assert.equal(plan.total.length, 1);
+  assert.equal(plan.total[0].herd, summary(f).herd.length);
+  assert.equal(plan.total[0].births, 0);
+  assert.equal(plan.total[0].inferred, undefined);
+  assert.deepEqual(Object.keys(plan.cohortsByYear), ["2026"]);
+  assert.deepEqual(plan.cohortsByYear[2026].map((c) => c.animalId).sort(), [
+    "calf",
+    "mother",
+  ]);
+  assert.ok(
+    plan.cohortsByYear[2026].every((c) => !c.inferred && c.count === 1),
+  );
+  assert.equal(plan.byOwner.a[0].herd, 1);
+  assert.equal(plan.byOwner.b[0].herd, 1);
 });

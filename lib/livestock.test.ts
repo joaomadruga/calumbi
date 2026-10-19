@@ -190,7 +190,7 @@ test("individual projections use actual sex, age and ownership rather than flat 
 });
 test("individual annual herd balances and totals reconcile with the shared farm simulation", () => {
   const plan = projectOwnership(demoFarm(), 15, now);
-  const fields: (keyof Projection)[] = [
+  const fields = [
     "herd",
     "births",
     "deaths",
@@ -202,7 +202,7 @@ test("individual annual herd balances and totals reconcile with the shared farm 
     "value",
     "cash",
     "fibonacci",
-  ];
+  ] as const;
   for (let i = 0; i < plan.total.length; i++) {
     for (const key of fields)
       close(

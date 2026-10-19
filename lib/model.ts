@@ -134,6 +134,8 @@ export function summary(f: Farm, now = new Date()) {
 }
 export type Projection = {
   year: number;
+  inferred?: boolean;
+  inferredHead?: number;
   herd: number;
   births: number;
   deaths: number;
@@ -149,6 +151,7 @@ export type Projection = {
 export type ProjectedCohort = {
   id: string;
   motherId?: string;
+  inferred?: boolean;
   owner: string;
   sex: "F" | "M";
   ageMonths: number;
@@ -163,11 +166,18 @@ export function project(f: Farm, years = 10, now = new Date()): Projection[] {
   return projectOwnership(f, years, now).total;
 }
 
+export type ProjectionInference = {
+  seeds: (ProjectedCohort & { weight: number })[];
+  clocks: Record<string, number>;
+  birthsByOwner: Record<string, number>;
+};
+
 /** One shared herd simulation. Every cohort retains its owner's identity. */
 export function projectOwnership(
   f: Farm,
   years = 10,
   now = new Date(),
+  inference?: ProjectionInference,
 ): {
   total: Projection[];
   byOwner: Record<string, Projection[]>;
@@ -182,6 +192,7 @@ export function projectOwnership(
   type Cohort = {
     id: string;
     motherId?: string;
+    inferred?: boolean;
     animalId?: string;
     tag?: string;
     sex: "F" | "M";
@@ -207,11 +218,32 @@ export function projectOwnership(
     owner: a.owner,
     pregnant: a.details?.reproductiveStatus === "pregnant",
     nextBirthDay:
+      inference?.clocks[a.id] ??
       (a.details?.reproductiveStatus === "pregnant"
         ? 0
         : Math.max(0, s.maturityMonths - ageMonths(a.born, now)) *
           daysPerMonth) + s.gestationDays,
   }));
+  for (const seed of inference?.seeds ?? [])
+    cohorts.push({
+      id: seed.id,
+      motherId: seed.motherId,
+      inferred: true,
+      owner: seed.owner,
+      sex: seed.sex,
+      age: seed.ageMonths,
+      birthYear: seed.birthYear,
+      count: seed.count,
+      weight: seed.weight,
+      nextBirthDay: inference!.clocks[seed.id],
+    });
+  const baseHead = cohorts.reduce((n, c) => n + c.count, 0);
+  const baseValue = cohorts.reduce(
+    (n, c) => n + c.count * animalValue(c.weight, s),
+    0,
+  );
+  const baseReserve =
+    (s.fixedMonthly + baseHead * s.monthlyPerHead) * s.reserveMonths;
   const cohortsByYear: Record<number, ProjectedCohort[]> = {};
   const saveCohorts = (year: number) => {
     cohortsByYear[year] = cohorts
@@ -219,6 +251,7 @@ export function projectOwnership(
       .map((c) => ({
         id: c.id,
         ...(c.motherId ? { motherId: c.motherId } : {}),
+        ...(c.inferred ? { inferred: true } : {}),
         owner: c.owner,
         sex: c.sex,
         ageMonths: Math.floor(c.age + 1e-8),
@@ -252,27 +285,50 @@ export function projectOwnership(
   const total: Projection[] = [
     {
       ...empty(now.getFullYear()),
-      herd: cohorts.length,
-      reserve: base.reserveTarget,
-      value: base.value,
+      herd: baseHead,
+      reserve: baseReserve,
+      value: baseValue,
+      ...(inference
+        ? {
+            inferred: true,
+            inferredHead: inference.seeds.reduce((n, c) => n + c.count, 0),
+            births: Object.values(inference.birthsByOwner).reduce(
+              (n, v) => n + v,
+              0,
+            ),
+          }
+        : {}),
       cash,
-      fibonacci: cohorts.length,
+      fibonacci: baseHead,
     },
   ];
   const byOwner: Record<string, Projection[]> = Object.fromEntries(
     owners.map((owner) => {
-      const animals = active(f).filter((a) => a.owner === owner),
-        share = base.herd.length ? animals.length / base.herd.length : 0;
+      const animals = cohorts.filter((a) => a.owner === owner),
+        heads = animals.reduce((n, c) => n + c.count, 0),
+        share = baseHead ? heads / baseHead : 0;
       return [
         owner,
         [
           {
             ...empty(now.getFullYear()),
-            herd: animals.length,
-            value: animals.reduce((n, a) => n + animalValue(a.weight, s), 0),
+            herd: heads,
+            ...(inference
+              ? {
+                  inferred: true,
+                  inferredHead: animals
+                    .filter((a) => a.inferred)
+                    .reduce((n, c) => n + c.count, 0),
+                  births: inference.birthsByOwner[owner] ?? 0,
+                }
+              : {}),
+            value: animals.reduce(
+              (n, a) => n + a.count * animalValue(a.weight, s),
+              0,
+            ),
             cash: cash * share,
-            reserve: base.reserveTarget * share,
-            fibonacci: animals.length,
+            reserve: baseReserve * share,
+            fibonacci: heads,
           },
         ],
       ];
@@ -414,9 +470,7 @@ export function projectOwnership(
     }
     for (const owner of owners) {
       const row = rows[owner];
-      const initialShare = base.herd.length
-        ? byOwner[owner][0].herd / base.herd.length
-        : 0;
+      const initialShare = baseHead ? byOwner[owner][0].herd / baseHead : 0;
       const averageShare =
         start + herd
           ? (starts[owner] + row.herd) / (start + herd)
@@ -446,7 +500,7 @@ export function projectOwnership(
       contribution,
       value: Object.values(rows).reduce((n, r) => n + r.value, 0),
       cash,
-      fibonacci: base.herd.length * fibB,
+      fibonacci: baseHead * fibB,
     });
   }
   return { total, byOwner, cohortsByYear };

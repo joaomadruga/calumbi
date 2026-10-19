@@ -72,7 +72,9 @@ export default function HerdEvolution({
   cohortData,
   adultMonths = 36,
   onResetScope,
+  actual = false,
 }: {
+  actual?: boolean;
   data: Projection[];
   capacity: number;
   participants: Participant[];
@@ -436,29 +438,36 @@ export default function HerdEvolution({
       <div className="card-heading herd-evolution-heading">
         <div>
           <span className="section-eyebrow">
-            CADA ANIMAL, UMA PARTE DO FUTURO
+            {actual
+              ? "OS ANIMAIS DA FAZENDA HOJE"
+              : "CADA ANIMAL, UMA PARTE DO FUTURO"}
           </span>
           <h2>
-            {ownerName
-              ? `A família de ${ownerName.split(" ")[0]}.`
-              : "A árvore das próximas gerações."}
+            {actual
+              ? "Seu rebanho, de perto."
+              : ownerName
+                ? `A família de ${ownerName.split(" ")[0]}.`
+                : "A árvore das próximas gerações."}
           </h2>
           <p>
-            Mães acima, crias abaixo. Acompanhe as famílias e o ano de
-            nascimento de cada geração.
+            {actual
+              ? "Somente animais ativos cadastrados, organizados por participante. Clique para aproximar e ver a idade."
+              : "Mães acima, crias abaixo. Acompanhe as famílias e o ano de nascimento de cada geração."}
           </p>
         </div>
-        <button
-          className={`button ${playing ? "secondary" : "primary"}`}
-          aria-pressed={playing}
-          onClick={() => {
-            if (index === data.length - 1) setYear(data[0].year);
-            setPlaying(!playing);
-          }}
-        >
-          {playing ? <Pause size={15} /> : <Play size={15} />}{" "}
-          {playing ? "Pausar" : "Ver evolução"}
-        </button>
+        {!actual && (
+          <button
+            className={`button ${playing ? "secondary" : "primary"}`}
+            aria-pressed={playing}
+            onClick={() => {
+              if (index === data.length - 1) setYear(data[0].year);
+              setPlaying(!playing);
+            }}
+          >
+            {playing ? <Pause size={15} /> : <Play size={15} />}{" "}
+            {playing ? "Pausar" : "Ver evolução"}
+          </button>
+        )}
       </div>
       <div className="network-view-toolbar">
         <div
@@ -478,11 +487,14 @@ export default function HerdEvolution({
             aria-pressed={view === "top-down"}
             onClick={() => setView("top-down")}
           >
-            <GitFork size={14} /> Árvore genealógica
+            <GitFork size={14} />{" "}
+            {actual ? "Por participante" : "Árvore genealógica"}
           </button>
         </div>
         <select
-          aria-label="Filtrar família pela matriz"
+          aria-label={
+            actual ? "Filtrar animal cadastrado" : "Filtrar família pela matriz"
+          }
           value={selectedSource ?? ""}
           onChange={(e) => {
             const source = e.target.value;
@@ -495,12 +507,14 @@ export default function HerdEvolution({
             setFocusRevision((v) => v + 1);
           }}
         >
-          <option value="">Todas as famílias</option>
+          <option value="">
+            {actual ? "Todos os animais" : "Todas as famílias"}
+          </option>
           {Object.values(cowGroups)
             .flat()
             .filter(
               (n) =>
-                n.sex === "F" &&
+                (actual || n.sex === "F") &&
                 !n.motherId &&
                 (!focusedOwner || n.owner === focusedOwner),
             )
@@ -510,11 +524,13 @@ export default function HerdEvolution({
                 {n.birthYear}
               </option>
             ))}
-          {selectedCow && (selectedCow.motherId || selectedCow.sex === "M") && (
-            <option value={selectedSource!}>
-              {selectedCow.label} · {selectedCow.birthYear}
-            </option>
-          )}
+          {!actual &&
+            selectedCow &&
+            (selectedCow.motherId || selectedCow.sex === "M") && (
+              <option value={selectedSource!}>
+                {selectedCow.label} · {selectedCow.birthYear}
+              </option>
+            )}
         </select>
         {focusedOwner ? (
           <div className="network-focus-breadcrumb">
@@ -539,7 +555,7 @@ export default function HerdEvolution({
       {!selectedSource && roots.length > 0 && (
         <div className="genealogy-navigation">
           <span>
-            Famílias {currentPage * 6 + 1}–
+            {actual ? "Animais" : "Famílias"} {currentPage * 6 + 1}–
             {Math.min((currentPage + 1) * 6, roots.length)} de {roots.length} ·
             role para ampliar, arraste para explorar
           </span>
@@ -580,7 +596,9 @@ export default function HerdEvolution({
             <strong>{snapshot.year}</strong>
             <span>
               {index === 0
-                ? "Hoje"
+                ? snapshot.inferred
+                  ? "Base inferida até hoje"
+                  : "Hoje"
                 : `+${index} ${index === 1 ? "ano" : "anos"}`}
             </span>
           </div>
@@ -729,11 +747,13 @@ export default function HerdEvolution({
                             >
                               {leaf.animal.historical
                                 ? "Ancestral · "
-                                : leaf.animal.projected
-                                  ? "Prev. "
-                                  : leaf.animal.birthEstimated
-                                    ? "Nasc. ≈ "
-                                    : "Nasc. "}
+                                : leaf.animal.inferred
+                                  ? "Inferido "
+                                  : leaf.animal.projected
+                                    ? "Prev. "
+                                    : leaf.animal.birthEstimated
+                                      ? "Nasc. ≈ "
+                                      : "Nasc. "}
                               {leaf.animal.birthYear}
                             </text>
                             <text
@@ -918,44 +938,50 @@ export default function HerdEvolution({
         <span>
           <i className="adult" /> Adulta · {Math.max(12, adultMonths)}+ meses
         </span>
-        <small>Clique numa vaquinha para aproximar sua família.</small>
+        <small>
+          {actual
+            ? "Clique num animal para aproximar."
+            : "Clique numa vaquinha para aproximar sua família."}
+        </small>
       </div>
-      <div className="radial-time-control">
-        <button
-          className="icon-button"
-          aria-label="Ano anterior"
-          disabled={index === 0}
-          onClick={() => choose(index - 1)}
-        >
-          <ChevronLeft size={19} />
-        </button>
-        <div>
-          <label htmlFor="herd-year-range">
-            {data[0].year}
-            <span>Ano {snapshot.year}</span>
-            {data.at(-1)?.year}
-          </label>
-          <input
-            id="herd-year-range"
-            type="range"
-            min="0"
-            max={Math.max(0, data.length - 1)}
-            step="1"
-            value={index}
-            aria-label="Ano da projeção"
-            aria-valuetext={`${snapshot.year}: ${decimal(snapshot.herd)} cabeças`}
-            onChange={(e) => choose(Number(e.target.value))}
-          />
+      {!actual && (
+        <div className="radial-time-control">
+          <button
+            className="icon-button"
+            aria-label="Ano anterior"
+            disabled={index === 0}
+            onClick={() => choose(index - 1)}
+          >
+            <ChevronLeft size={19} />
+          </button>
+          <div>
+            <label htmlFor="herd-year-range">
+              {data[0].year}
+              <span>Ano {snapshot.year}</span>
+              {data.at(-1)?.year}
+            </label>
+            <input
+              id="herd-year-range"
+              type="range"
+              min="0"
+              max={Math.max(0, data.length - 1)}
+              step="1"
+              value={index}
+              aria-label="Ano da projeção"
+              aria-valuetext={`${snapshot.year}: ${decimal(snapshot.herd)} cabeças`}
+              onChange={(e) => choose(Number(e.target.value))}
+            />
+          </div>
+          <button
+            className="icon-button"
+            aria-label="Próximo ano"
+            disabled={index === data.length - 1}
+            onClick={() => choose(index + 1)}
+          >
+            <ChevronRight size={19} />
+          </button>
         </div>
-        <button
-          className="icon-button"
-          aria-label="Próximo ano"
-          disabled={index === data.length - 1}
-          onClick={() => choose(index + 1)}
-        >
-          <ChevronRight size={19} />
-        </button>
-      </div>
+      )}
       <div className="radial-people-legend">
         <button
           className={!focusedOwner ? "is-active" : ""}
@@ -1004,18 +1030,22 @@ export default function HerdEvolution({
           <span>
             {selectedCow.historical
               ? "Ancestral fora do rebanho atual"
-              : `${decimal(selectedCow.count)} cabeças esperadas`}
+              : actual
+                ? `${decimal(selectedCow.count)} animal cadastrado`
+                : `${decimal(selectedCow.count)} cabeças esperadas`}
           </span>
-          <p>
-            Mãe:{" "}
-            {Object.values(cowGroups)
-              .flat()
-              .find((n) => n.sourceIds.includes(selectedCow.motherId ?? ""))
-              ?.label ?? "não informada"}
-            . O ramo mostra as ancestrais e descendentes projetadas. Ancestrais
-            fora do rebanho aparecem apagadas para preservar o parentesco, sem
-            entrar nas contagens.
-          </p>
+          {!actual && (
+            <p>
+              Mãe:{" "}
+              {Object.values(cowGroups)
+                .flat()
+                .find((n) => n.sourceIds.includes(selectedCow.motherId ?? ""))
+                ?.label ?? "não informada"}
+              . O ramo mostra as ancestrais e descendentes projetadas.
+              Ancestrais fora do rebanho aparecem apagadas para preservar o
+              parentesco, sem entrar nas contagens.
+            </p>
+          )}
         </div>
       )}
       {fibonacci && (
@@ -1025,87 +1055,106 @@ export default function HerdEvolution({
           participa dos aportes.
         </div>
       )}
-      <div
-        className="herd-year-detail"
-        key={`${current.year}-${focusedOwner ?? "farm"}`}
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        <div className="herd-detail-intro">
-          <span className="section-eyebrow">
-            {detailName
-              ? `REBANHO DE ${detailName.toUpperCase()}`
-              : index === 0
-                ? "A FAZENDA DE HOJE"
-                : "O QUE ESTE ANO PEDE"}
-          </span>
-          <h3>
-            {current.year}
-            <span> · {decimal(current.herd)} cabeças</span>
-          </h3>
-          <p>
-            {index === 0
-              ? "A posição atual da fazenda, antes dos próximos ciclos de criação."
-              : `${decimal(current.births)} nascimentos, ${decimal(current.deaths)} mortes e ${decimal(current.sales)} vendas e descartes no ano.`}
-          </p>
-        </div>
-        <div className="herd-detail-numbers">
-          <div>
-            <span>Patrimônio estimado</span>
-            <strong>{money(current.value)}</strong>
-          </div>
-          <div>
-            <span>
+      {!actual && (
+        <div
+          className="herd-year-detail"
+          key={`${current.year}-${focusedOwner ?? "farm"}`}
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <div className="herd-detail-intro">
+            <span className="section-eyebrow">
+              {detailName
+                ? `REBANHO DE ${detailName.toUpperCase()}`
+                : index === 0
+                  ? current.inferred
+                    ? "BASE SIMULADA ATÉ HOJE"
+                    : "A FAZENDA DE HOJE"
+                  : "O QUE ESTE ANO PEDE"}
+            </span>
+            <h3>
+              {current.year}
+              <span> · {decimal(current.herd)} cabeças</span>
+            </h3>
+            <p>
               {index === 0
-                ? detailName
-                  ? "Parcela do caixa comum"
-                  : "Caixa disponível"
-                : "Custo de manter no ano"}
-            </span>
-            <strong>{money(index === 0 ? current.cash : current.costs)}</strong>
+                ? current.inferred
+                  ? `Base simulada até hoje: inclui ${decimal(current.inferredHead ?? 0)} crias esperadas desde as compras, sem cadastrá-las como gado real. ${decimal(current.births)} nascimentos inferidos neste ano até hoje. O caixa parte do saldo real atual.`
+                  : "A posição atual da fazenda, antes dos próximos ciclos de criação."
+                : `${decimal(current.births)} nascimentos, ${decimal(current.deaths)} mortes e ${decimal(current.sales)} vendas e descartes no ano.`}
+            </p>
           </div>
-          <div>
-            <span>Aporte necessário no ano</span>
-            <strong
-              className={current.contribution > 0 ? "warning" : "positive"}
-            >
-              {money(current.contribution)}
-            </strong>
-          </div>
-        </div>
-        {index > 0 && detailParticipants.length > 0 && (
-          <div className="herd-detail-shares">
-            <span>
-              <Wallet size={13} /> Como fica para cada pessoa
-            </span>
+          <div className="herd-detail-numbers">
             <div>
-              {detailParticipants.map((person) => (
-                <span key={person.id}>
-                  <i style={{ background: person.color }} />
-                  <span>
-                    {person.name}
-                    <small>{decimal(person.share * 100)}% da cota atual</small>
-                  </span>
-                  <strong>
-                    {money(
-                      participantData?.[person.id]?.find(
-                        (row) => row.year === current.year,
-                      )?.contribution ?? current.contribution * person.share,
-                    )}
-                  </strong>
-                </span>
-              ))}
+              <span>Patrimônio estimado</span>
+              <strong>{money(current.value)}</strong>
+            </div>
+            <div>
+              <span>
+                {index === 0
+                  ? detailName
+                    ? "Parcela do caixa comum"
+                    : "Caixa disponível"
+                  : "Custo de manter no ano"}
+              </span>
+              <strong>
+                {money(index === 0 ? current.cash : current.costs)}
+              </strong>
+            </div>
+            <div>
+              <span>Aporte necessário no ano</span>
+              <strong
+                className={current.contribution > 0 ? "warning" : "positive"}
+              >
+                {money(current.contribution)}
+              </strong>
             </div>
           </div>
-        )}
-      </div>
+          {index > 0 && detailParticipants.length > 0 && (
+            <div className="herd-detail-shares">
+              <span>
+                <Wallet size={13} /> Como fica para cada pessoa
+              </span>
+              <div>
+                {detailParticipants.map((person) => (
+                  <span key={person.id}>
+                    <i style={{ background: person.color }} />
+                    <span>
+                      {person.name}
+                      <small>
+                        {decimal(person.share * 100)}% da cota atual
+                      </small>
+                    </span>
+                    <strong>
+                      {money(
+                        participantData?.[person.id]?.find(
+                          (row) => row.year === current.year,
+                        )?.contribution ?? current.contribution * person.share,
+                      )}
+                    </strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <div className="chart-footnote">
-        Árvore materna projetada: cada cria fica ligada à mãe usada na
-        simulação. Para os animais já cadastrados, a mãe não foi informada e
-        nenhum parentesco é inventado. Valores fracionários são expectativas de
-        nascimento e sobrevivência. Ancestrais apagadas não fazem parte do
-        rebanho atual. Capacidade compartilhada: {capacity} cabeças. Custos e
-        aportes são rateados pelo rebanho médio de cada ano.
+        {actual ? (
+          "Esta visão mostra apenas os animais ativos cadastrados. Não inclui crias inferidas, nascimentos futuros, vendas simuladas ou parentesco não informado."
+        ) : (
+          <>
+            Inferência desde as datas de compra cadastradas: os nascimentos
+            anteriores a hoje são estimados, não registros reais. Não são
+            gravados animais nem receitas passadas. Árvore materna projetada:
+            cada cria fica ligada à mãe usada na simulação. Para os animais já
+            cadastrados, a mãe não foi informada e nenhum parentesco é
+            inventado. Valores fracionários são expectativas de nascimento e
+            sobrevivência. Ancestrais apagadas não fazem parte do rebanho atual.
+            Capacidade compartilhada: {capacity} cabeças. Custos e aportes são
+            rateados pelo rebanho médio de cada ano.
+          </>
+        )}
       </div>
     </section>
   );

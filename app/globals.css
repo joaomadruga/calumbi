@@ -4644,3 +4644,7 @@ dd {
     padding-inline: 17px;
   }
 }
+
+.overview-current-herd {
+  margin-bottom: 24px;
+}
