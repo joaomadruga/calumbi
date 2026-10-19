@@ -2,6 +2,7 @@ import {
   active,
   normalizeSettings,
   type Farm,
+  type AnnualSalePolicy,
   type Animal,
   type ProjectionInference,
 } from "./model.ts";
@@ -24,6 +25,7 @@ export type SandboxInput = {
   monthlyPerHead: number;
   fixedMonthly: number;
   years: number;
+  sales?: AnnualSalePolicy & { capacity: number };
 };
 export function simulateInvestment(
   farm: Farm,
@@ -72,10 +74,23 @@ export function simulateInvestment(
     if (!["equal", "proportional"].includes(input.bull.split))
       throw new Error("Rateio inválido.");
   }
+  if (input.sales) {
+    number(input.sales.capacity, "a lotação máxima", 1, 100000);
+    if (!Number.isInteger(input.sales.capacity))
+      throw new Error("Use uma lotação inteira.");
+    number(input.sales.calfPrice, "o preço do bezerro", 0.01);
+    number(input.sales.heiferPrice, "o preço da novilha", 0.01);
+    number(input.sales.retainedPercent, "a retenção para o caixa", 0, 100);
+    number(input.sales.minimumArrobas, "o peso mínimo de venda", 6, 100);
+    number(input.sales.dailyGain, "o ganho diário de peso", 0.01, 2);
+    if (!["live", "carcass"].includes(input.sales.arrobaBasis))
+      throw new Error("Base da arroba inválida.");
+  }
   const settings = {
     ...normalizeSettings(farm.settings),
     monthlyPerHead: input.monthlyPerHead,
     fixedMonthly: input.fixedMonthly,
+    ...(input.sales ? { capacity: input.sales.capacity } : {}),
   };
   const date = now.toISOString().slice(0, 10);
   const additions: Animal[] = input.purchases.flatMap((p) =>
@@ -207,6 +222,7 @@ export function simulateInvestment(
       now,
       { 2023: 24, 2025: 36 },
       stage.extra,
+      input.sales,
     );
     return {
       id: stage.id,

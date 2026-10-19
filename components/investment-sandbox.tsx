@@ -12,6 +12,7 @@ import {
   type SandboxInput,
 } from "@/lib/investment-sandbox";
 import WeightField from "./weight-field";
+import HerdEvolution from "./herd-evolution";
 const cash = (n: number) =>
   n.toLocaleString("pt-BR", {
     style: "currency",
@@ -42,6 +43,15 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
     monthlyPerHead: farm.settings.monthlyPerHead,
     fixedMonthly: farm.settings.fixedMonthly,
     years: 5,
+    sales: {
+      calfPrice: 450,
+      heiferPrice: 370,
+      retainedPercent: 10,
+      minimumArrobas: 6,
+      arrobaBasis: "carcass",
+      dailyGain: 0.5,
+      capacity: farm.settings.capacity,
+    },
   });
   const [draft, setDraft] = useState<SandboxInput>(defaults);
   const [applied, setApplied] = useState<SandboxInput | null>(null);
@@ -86,6 +96,8 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
         row.owner === id ? { ...row, [key]: value } : row,
       ),
     }));
+  const sales = (key: string, value: number | string) =>
+    setDraft((p) => ({ ...p, sales: { ...p.sales!, [key]: value } }));
   const bull = (key: string, value: number | string | boolean) =>
     setDraft((p) => ({ ...p, bull: { ...p.bull, [key]: value } }));
   return (
@@ -374,6 +386,93 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
             afeta somente este teste. A compra considera novos aportes dos
             participantes, sem usar o caixa atual.
           </p>
+          <h2>Venda anual e retorno</h2>
+          <div className="sandbox-form-grid">
+            {(
+              [
+                [
+                  "calfPrice",
+                  "Bezerro: preço por @ (R$)",
+                  0.01,
+                  100000000,
+                  0.01,
+                ],
+                [
+                  "heiferPrice",
+                  "Novilha: preço por @ (R$) — referência 350 a 390",
+                  0.01,
+                  100000000,
+                  0.01,
+                ],
+                [
+                  "retainedPercent",
+                  "Parte de cada venda para o caixa (%)",
+                  0,
+                  100,
+                  1,
+                ],
+                [
+                  "capacity",
+                  "Máximo de cabeças antes da venda por lotação",
+                  1,
+                  100000,
+                  1,
+                ],
+                [
+                  "dailyGain",
+                  "Ganho diário estimado por animal (kg)",
+                  0.01,
+                  2,
+                  0.01,
+                ],
+              ] as const
+            ).map(([key, label, min, max, step]) => (
+              <label className="field" key={key}>
+                <span>{label}</span>
+                <input
+                  type="number"
+                  required
+                  min={min}
+                  max={max}
+                  step={step}
+                  value={draft.sales![key]}
+                  onChange={(e) => sales(key, Number(e.target.value))}
+                />
+              </label>
+            ))}
+            <label className="field">
+              <span>Como calcular as 6@ mínimas?</span>
+              <select
+                value={draft.sales!.arrobaBasis}
+                onChange={(e) => sales("arrobaBasis", e.target.value)}
+              >
+                <option value="carcass">
+                  Carcaça: kg vivo × rendimento ÷ 15
+                </option>
+                <option value="live">Peso vivo: kg vivo ÷ 15</option>
+              </select>
+            </label>
+          </div>
+          <p className="form-note">
+            Venda uma vez por ano de todas as crias que atingirem pelo menos 6@,
+            machos e fêmeas. Abaixo disso, continuam no rebanho. As matrizes
+            ficam; excesso de lotação gera vendas adicionais, preservando
+            reprodutores e o peso mínimo. Novilhas são fêmeas de 12 a 35 meses;
+            demais adultos usam a arroba cadastrada da fazenda. Preços
+            permanecem constantes. Na base carcaça, 6@ equivalem a{" "}
+            {decimal(90 / (farm.settings.yield / 100))} kg vivos com rendimento
+            de {decimal(farm.settings.yield)}%. Ganho de peso é uma premissa
+            aproximada, aplicada a todos os animais até o limite de peso do
+            modelo.
+            <a
+              href="https://www.infoteca.cnptia.embrapa.br/infoteca/bitstream/doc/920741/1/500perguntasgadodecorte.pdf"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {" "}
+              Referência da conversão: Embrapa.
+            </a>
+          </p>
           <div className="sandbox-form-actions">
             <button
               className="button primary"
@@ -582,12 +681,37 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
               </label>
             </div>
             <Comparison result={result} owner={owner} />
+            {selected && (
+              <HerdEvolution
+                key={stageId + owner + JSON.stringify(applied)}
+                data={
+                  owner === "all"
+                    ? selected.plan.total
+                    : (selected.plan.byOwner[owner] ?? [])
+                }
+                capacity={result.settings.capacity}
+                participants={selected.people.filter(
+                  (p) => owner === "all" || p.id === owner,
+                )}
+                participantData={selected.plan.byOwner}
+                cohortData={selected.plan.cohortsByYear}
+                adultMonths={result.settings.maturityMonths}
+                ownerName={farm.investors.find((p) => p.id === owner)?.name}
+                onResetScope={() => setOwner("all")}
+              />
+            )}
+
             <p className="form-note">
               A curva usa a mesma inferência de crias da aba Projeções. Por isso
               o estoque simulado pode ser maior que o número cadastrado nas
               etapas acima. Nada é cadastrado nem gravado na planilha.
             </p>
           </section>
+          <ReturnForecast
+            stage={selected}
+            baseline={result.stages[0]}
+            owner={owner}
+          />
         </section>
       )}
     </div>
@@ -697,5 +821,106 @@ function Comparison({
         </div>
       </details>
     </>
+  );
+}
+
+function ReturnForecast({
+  stage,
+  baseline,
+  owner,
+}: {
+  stage: ReturnType<typeof simulateInvestment>["stages"][number];
+  baseline: ReturnType<typeof simulateInvestment>["stages"][number];
+  owner: string;
+}) {
+  const rows = (
+    owner === "all" ? stage.plan.total : (stage.plan.byOwner[owner] ?? [])
+  ).slice(1);
+  const people = stage.people.filter((p) => owner === "all" || p.id === owner);
+  const purchase = people.reduce((n, p) => n + p.investment, 0);
+  let cumulative = -purchase;
+  const sales = rows.reduce((n, r) => n + r.revenue, 0);
+  const distributed = rows.reduce((n, r) => n + (r.distributed ?? 0), 0);
+  const contributions = rows.reduce((n, r) => n + r.contribution, 0);
+  const initialValue =
+    (owner === "all"
+      ? baseline.plan.total
+      : (baseline.plan.byOwner[owner] ?? []))[0]?.value ?? 0;
+  const invested = initialValue + purchase + contributions;
+  const netCash = distributed - contributions - purchase;
+  return (
+    <section className="card sandbox-card">
+      <span className="section-eyebrow">
+        RETORNO APROXIMADO · {stage.label}
+      </span>
+      <h2>Quanto pode voltar para os participantes?</h2>
+      <p>
+        Vendas brutas: <strong>{cash(sales)}</strong> · Distribuído:{" "}
+        <strong>{cash(distributed)}</strong> · Aportes futuros:{" "}
+        <strong>{cash(contributions)}</strong> · Saldo em dinheiro:{" "}
+        <strong>{cash(netCash)}</strong>
+      </p>
+      <p className="form-note">
+        Saldo = distribuições menos compras do teste e novos aportes. O
+        patrimônio atual não é dinheiro recebido. Retorno em caixa sobre capital
+        comprometido:
+        {invested > 0
+          ? " " +
+            decimal(
+              ((distributed - contributions - purchase) / invested) * 100,
+              2,
+            ) +
+            "%"
+          : " sem base de capital"}
+        . A base inclui o valor estimado do rebanho atual, compras e aportes;
+        não inclui a venda do estoque final. A parcela retida paga custos e
+        reservas da fazenda, não é lucro distribuído. Pesos ausentes prejudicam
+        a avaliação inicial e o prazo de venda. Impostos e taxas não estão
+        incluídos.
+      </p>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Ano</th>
+              <th>Cabeças vendidas</th>
+              <th>Receita bruta</th>
+              <th>Para o caixa</th>
+              <th>Distribuído</th>
+              <th>Custos</th>
+              <th>Aportes</th>
+              <th>Saldo acumulado</th>
+              <th>Excesso sem venda</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              cumulative += (r.distributed ?? 0) - r.contribution;
+              return (
+                <tr key={r.year}>
+                  <td>{r.year}</td>
+                  <td>{decimal(r.sales, 2)}</td>
+                  <td>{cash(r.revenue)}</td>
+                  <td>{cash(r.retained ?? 0)}</td>
+                  <td>{cash(r.distributed ?? 0)}</td>
+                  <td>{cash(r.costs)}</td>
+                  <td>{cash(r.contribution)}</td>
+                  <td>{cash(cumulative)}</td>
+                  <td>
+                    {owner === "all" ? decimal(r.unsoldExcess ?? 0, 2) : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="form-note">
+        Valores esperados podem ter cabeças fracionárias por natalidade e
+        mortalidade probabilísticas. O primeiro ano futuro representa os
+        próximos 12 meses a partir do cálculo. Use o filtro de participante
+        acima para ver seu retorno.
+      </p>
+    </section>
   );
 }

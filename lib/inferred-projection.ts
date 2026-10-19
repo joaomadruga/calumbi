@@ -5,6 +5,7 @@ import {
   normalizeSettings,
   projectOwnership,
   type Farm,
+  type AnnualSalePolicy,
   type ProjectedCohort,
   type ProjectionInference,
 } from "./model.ts";
@@ -26,6 +27,7 @@ export function projectFromPurchases(
   now = new Date(),
   purchaseAges: Record<number, number> = {},
   additionalSeeds: ProjectionInference["seeds"] = [],
+  salePolicy?: AnnualSalePolicy,
 ) {
   // Farm-specific purchase memories are optional and affect only the simulation.
   const f: Farm = {
@@ -193,16 +195,22 @@ export function projectFromPurchases(
         (c) => c.inferred !== false && c.ageMonths === age,
       ),
       count = group.reduce((n, c) => n + c.count, 0);
-    const take = Math.min(excess, count);
+    const take = salePolicy ? 0 : Math.min(excess, count);
     if (count) for (const c of group) c.count *= 1 - take / count;
     excess -= take;
   }
   // Keep the live cash ledger as today's baseline: inferred past sales never create real cash.
-  const plan = projectOwnership(f, years, now, {
-    seeds,
-    clocks,
-    birthsByOwner,
-  });
+  const plan = projectOwnership(
+    f,
+    years,
+    now,
+    {
+      seeds,
+      clocks,
+      birthsByOwner,
+    },
+    salePolicy,
+  );
   const first = Math.min(
     now.getFullYear(),
     ...[...entries.values()].map((date) => new Date(date).getUTCFullYear()),

@@ -141,6 +141,9 @@ export type Projection = {
   deaths: number;
   sales: number;
   revenue: number;
+  distributed?: number;
+  retained?: number;
+  unsoldExcess?: number;
   costs: number;
   reserve: number;
   contribution: number;
@@ -167,6 +170,14 @@ export function project(f: Farm, years = 10, now = new Date()): Projection[] {
   return projectOwnership(f, years, now).total;
 }
 
+export type AnnualSalePolicy = {
+  calfPrice: number;
+  heiferPrice: number;
+  retainedPercent: number;
+  minimumArrobas: number;
+  arrobaBasis: "live" | "carcass";
+  dailyGain: number;
+};
 export type ProjectionInference = {
   seeds: (ProjectedCohort & { weight: number })[];
   clocks: Record<string, number>;
@@ -179,6 +190,7 @@ export function projectOwnership(
   years = 10,
   now = new Date(),
   inference?: ProjectionInference,
+  salePolicy?: AnnualSalePolicy,
 ): {
   total: Projection[];
   byOwner: Record<string, Projection[]>;
@@ -186,6 +198,20 @@ export function projectOwnership(
 } {
   const s = normalizeSettings(f.settings),
     base = summary(f, now);
+  const arrobas = (weight: number) =>
+    (weight * (salePolicy?.arrobaBasis === "live" ? 1 : s.yield / 100)) / 15;
+  const saleValue = (c: { weight: number; sex: "F" | "M"; age: number }) =>
+    salePolicy
+      ? arrobas(c.weight) *
+        (c.sex === "F" && c.age >= 12 && c.age < 36
+          ? salePolicy.heiferPrice
+          : c.age < 24
+            ? salePolicy.calfPrice
+            : s.arroba)
+      : animalValue(c.weight, s);
+  const eligible = (c: { weight: number; breeder?: boolean }) =>
+    !c.breeder &&
+    (!salePolicy || arrobas(c.weight) >= salePolicy.minimumArrobas);
   const daysPerYear = 365.25,
     daysPerMonth = daysPerYear / 12;
   const cycleDays = s.gestationDays + s.postpartumDays;
@@ -204,6 +230,7 @@ export function projectOwnership(
     count: number;
     weight: number;
     owner: string;
+    annualSale?: boolean;
     pregnant?: boolean;
     nextBirthDay: number;
   };
@@ -215,6 +242,7 @@ export function projectOwnership(
     birthEstimated: !!a.details && a.details.birthSource !== "known",
     sex: a.sex,
     age: ageMonths(a.born, now),
+    annualSale: ageMonths(a.born, now) < 12,
     count: 1,
     weight: a.weight,
     owner: a.owner,
@@ -236,6 +264,7 @@ export function projectOwnership(
       owner: seed.owner,
       sex: seed.sex,
       age: seed.ageMonths,
+      annualSale: seed.ageMonths < 12,
       birthYear: seed.birthYear,
       count: seed.count,
       weight: seed.weight,
@@ -392,7 +421,9 @@ export function projectOwnership(
           rows[c.owner].deaths += dead;
           losses[c.owner] += dead * animalValue(30, s);
           const females = (births - dead) / 2,
-            retained = (females * s.femaleRetention) / 100;
+            retained = salePolicy
+              ? females
+              : (females * s.femaleRetention) / 100;
           rows[c.owner].sales += females - retained;
           rows[c.owner].revenue += (females - retained) * animalValue(180, s);
           const age = Math.max(0, (endDay - due) / daysPerMonth);
@@ -410,7 +441,9 @@ export function projectOwnership(
               sex,
               age,
               count,
-              weight: 30 + age * 7.5,
+              weight:
+                30 +
+                age * (salePolicy ? salePolicy.dailyGain * daysPerMonth : 7.5),
               owner: c.owner,
               nextBirthDay:
                 due + s.maturityMonths * daysPerMonth + s.gestationDays,
@@ -425,16 +458,22 @@ export function projectOwnership(
       c.age += 12;
       c.weight = Math.max(
         c.weight,
-        Math.min(c.sex === "F" ? 450 : 550, c.weight + 90),
+        Math.min(
+          c.sex === "F" ? 450 : 550,
+          c.weight + (salePolicy ? salePolicy.dailyGain * daysPerYear : 90),
+        ),
       );
     }
     cohorts = [...cohorts, ...newborns].filter((c) => {
       if (
-        (c.sex === "M" && !c.breeder && c.age >= s.saleMonths) ||
-        (c.sex === "F" && c.age >= s.cullMonths)
+        eligible(c) &&
+        ((salePolicy &&
+          (c.motherId || (!c.breeder && c.sex === "M") || c.annualSale)) ||
+          (c.sex === "M" && !c.breeder && c.age >= s.saleMonths) ||
+          (c.sex === "F" && c.age >= s.cullMonths))
       ) {
         rows[c.owner].sales += c.count;
-        rows[c.owner].revenue += c.count * animalValue(c.weight, s);
+        rows[c.owner].revenue += c.count * saleValue(c);
         return false;
       }
       return c.count > 1e-9;
@@ -446,10 +485,10 @@ export function projectOwnership(
       cohorts.reduce((n, c) => n + c.count, 0) - s.capacity,
     );
     for (const age of [
-      ...new Set(cohorts.filter((c) => !c.breeder).map((c) => c.age)),
+      ...new Set(cohorts.filter(eligible).map((c) => c.age)),
     ].sort((a, b) => a - b)) {
       if (excess <= 1e-9) break;
-      const group = cohorts.filter((c) => !c.breeder && c.age === age),
+      const group = cohorts.filter((c) => eligible(c) && c.age === age),
         count = group.reduce((n, c) => n + c.count, 0),
         take = Math.min(excess, count);
       if (!count) continue;
@@ -457,7 +496,7 @@ export function projectOwnership(
         const sold = (take * c.count) / count;
         c.count -= sold;
         rows[c.owner].sales += sold;
-        rows[c.owner].revenue += sold * animalValue(c.weight, s);
+        rows[c.owner].revenue += sold * saleValue(c);
       }
       excess -= take;
     }
@@ -476,8 +515,12 @@ export function projectOwnership(
       (s.fixedMonthly + herd * s.monthlyPerHead) * s.reserveMonths * inflation +
       loss;
     const revenue = Object.values(rows).reduce((n, r) => n + r.revenue, 0);
-    const contribution = Math.max(0, reserve - (cash + revenue - costs));
-    cash += revenue - costs + contribution;
+    const retained = salePolicy
+      ? (revenue * salePolicy.retainedPercent) / 100
+      : revenue;
+    const distributed = salePolicy ? revenue - retained : 0;
+    const contribution = Math.max(0, reserve - (cash + retained - costs));
+    cash += retained - costs + contribution;
     if (y > 1) {
       const next = fibA + fibB;
       fibA = fibB;
@@ -495,6 +538,10 @@ export function projectOwnership(
           ? (starts[owner] + row.herd) / (start + herd)
           : initialShare;
       const closingShare = herd ? row.herd / herd : averageShare;
+      if (salePolicy) {
+        row.retained = (row.revenue * salePolicy.retainedPercent) / 100;
+        row.distributed = row.revenue - row.retained;
+      }
       row.costs = costs * averageShare;
       row.reserve =
         (s.fixedMonthly * closingShare + row.herd * s.monthlyPerHead) *
@@ -514,6 +561,13 @@ export function projectOwnership(
       deaths: Object.values(rows).reduce((n, r) => n + r.deaths, 0),
       sales: Object.values(rows).reduce((n, r) => n + r.sales, 0),
       revenue,
+      ...(salePolicy
+        ? {
+            retained,
+            distributed,
+            unsoldExcess: Math.max(0, herd - s.capacity),
+          }
+        : {}),
       costs,
       reserve,
       contribution,

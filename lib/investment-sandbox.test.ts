@@ -270,3 +270,37 @@ test("shared bull quantities must be positive whole numbers within the limit", (
   assert.equal(disabled.bullCost, 0);
   assert.equal(disabled.stages[2].heads, 9);
 });
+
+test("annual sale settings belong only to the test and invalid policies are rejected", () => {
+  const f = farm(),
+    config = input();
+  const before = JSON.stringify(f);
+  config.sales = {
+    capacity: 7,
+    calfPrice: 450,
+    heiferPrice: 370,
+    retainedPercent: 10,
+    minimumArrobas: 6,
+    arrobaBasis: "carcass",
+    dailyGain: 0.5,
+  };
+  const result = simulateInvestment(f, config, now);
+  assert.equal(result.settings.capacity, 7);
+  assert.equal(JSON.stringify(f), before);
+  for (const change of [
+    { capacity: 0 },
+    { capacity: 1.5 },
+    { retainedPercent: 101 },
+    { calfPrice: 0 },
+    { heiferPrice: NaN },
+    { minimumArrobas: 5 },
+    { dailyGain: 0 },
+  ])
+    assert.throws(() =>
+      simulateInvestment(
+        f,
+        { ...config, sales: { ...config.sales!, ...change } },
+        now,
+      ),
+    );
+});
