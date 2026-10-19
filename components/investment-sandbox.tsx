@@ -32,6 +32,7 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
     pregnant: false,
     bull: {
       enabled: false,
+      quantity: 1,
       price: 0,
       ageMonths: 36,
       weight: 0,
@@ -216,7 +217,7 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
           </div>
         </section>
         <section className="card sandbox-card">
-          <span className="section-eyebrow">2 · UM BOI COMPARTILHADO</span>
+          <span className="section-eyebrow">2 · BOIS COMPARTILHADOS</span>
           <h2>E se todo mundo comprasse junto?</h2>
           <label className="sandbox-check">
             <input
@@ -225,17 +226,29 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
               onChange={(e) => bull("enabled", e.target.checked)}
             />
             <span>
-              Adicionar um boi ao teste
+              Adicionar bois ao teste
               <small>
-                Uma cabeça na fazenda, com frações pertencentes a cada
-                integrante.
+                Escolha a quantidade e divida a compra entre os integrantes.
+                Idade, peso e finalidade se aplicam a cada boi do lote.
               </small>
             </span>
           </label>
           {draft.bull.enabled && (
             <div className="sandbox-form-grid">
               <label className="field">
-                <span>Preço total do boi (R$)</span>
+                <span>Quantidade de bois</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="500"
+                  step="1"
+                  required
+                  value={draft.bull.quantity || ""}
+                  onChange={(e) => bull("quantity", Number(e.target.value))}
+                />
+              </label>
+              <label className="field">
+                <span>Preço por boi (R$)</span>
                 <input
                   type="number"
                   min=".01"
@@ -297,7 +310,7 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
             </div>
           )}
           <p className="form-note">
-            A compra do touro entra nas cotas e nos custos. A natalidade
+            A compra dos bois entra nas cotas e nos custos. A natalidade
             continua usando as premissas da fazenda; não há aumento automático
             da fertilidade.
           </p>
@@ -471,7 +484,7 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
                   <tr>
                     <th>Participante / cota</th>
                     <th>Compra das vacas</th>
-                    <th>Compra do boi</th>
+                    <th>Compra dos bois</th>
                     <th>Capital inicial</th>
                     <th>Manutenção / mês</th>
                     <th>Aportes futuros ({applied.years} anos)</th>
@@ -487,7 +500,7 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
                           {decimal(p.heads, 2)} cabeças ·{" "}
                           {decimal(p.share * 100, 2)}%
                           {selected.id === "bull" && p.bullShare > 0
-                            ? ` · ${decimal(p.bullShare * 100, 2)}% do boi`
+                            ? ` · ${decimal(p.bullShare * 100, 2)}% dos bois`
                             : ""}
                         </small>
                       </td>
@@ -540,7 +553,7 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
             </div>
             <p className="form-note">
               Cotas e custo mensal usam os animais cadastrados mais as compras
-              do teste, incluindo a fração do boi. Sem rebanho, o custo fixo é
+              do teste, incluindo a fração dos bois. Sem rebanho, o custo fixo é
               dividido igualmente. O rateio da compra ajusta os centavos para
               fechar o total. Aportes futuros consideram custos, receitas
               projetadas, perdas e reserva; são adicionais ao capital da compra.

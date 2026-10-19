@@ -38,6 +38,7 @@ function input(): SandboxInput {
     pregnant: false,
     bull: {
       enabled: true,
+      quantity: 1,
       price: 900,
       ageMonths: 36,
       weight: 600,
@@ -201,4 +202,71 @@ test("invalid quantities, prices, participant duplicates and horizons cannot pro
   );
   near(without.bullCost, 0);
   near(without.stages[2].heads, 9);
+});
+
+test("multiple shared bulls reconcile cost, ownership, maintenance, capacity and future cohorts", () => {
+  const config = input();
+  config.bull.quantity = 3;
+  const f = farm();
+  f.settings.capacity = 11;
+  const result = simulateInvestment(f, config, now);
+  const end = result.stages[2];
+  assert.equal(result.bullQuantity, 3);
+  assert.equal(result.bullCost, 2700);
+  assert.equal(end.capital, 12200);
+  assert.equal(end.heads, 12);
+  assert.equal(end.monthly, 2100);
+  assert.equal(end.excess, 1);
+  assert.equal(result.projectedCapacityPressure, 1);
+  assert.deepEqual(
+    end.people.map((p) => p.bullInvestment),
+    [1200, 600, 900],
+  );
+  near(
+    end.people.reduce((n, p) => n + p.heads, 0),
+    12,
+  );
+  near(
+    end.people.reduce((n, p) => n + p.monthly, 0),
+    2100,
+  );
+  for (const year of [2026, 2031])
+    near(
+      end.plan.cohortsByYear[year]
+        .filter((c) => c.id.startsWith("simulation-shared-bull"))
+        .reduce((n, c) => n + c.count, 0),
+      3,
+    );
+  config.bull.quantity = 2;
+  config.bull.price = 1000;
+  config.bull.split = "equal";
+  const equal = simulateInvestment(farm(), config, now).stages[2];
+  assert.deepEqual(
+    equal.people.map((p) => p.bullInvestment),
+    [666.67, 666.67, 666.66],
+  );
+  near(
+    equal.people.reduce((n, p) => n + p.heads - p.afterCows, 0),
+    2,
+  );
+});
+
+test("shared bull quantities must be positive whole numbers within the limit", () => {
+  const config = input();
+  for (const quantity of [0, -1, 1.5, NaN, Infinity, 501])
+    assert.throws(() =>
+      simulateInvestment(
+        farm(),
+        { ...config, bull: { ...config.bull, quantity } },
+        now,
+      ),
+    );
+  const disabled = simulateInvestment(
+    farm(),
+    { ...config, bull: { ...config.bull, enabled: false, quantity: 90 } },
+    now,
+  );
+  assert.equal(disabled.bullQuantity, 0);
+  assert.equal(disabled.bullCost, 0);
+  assert.equal(disabled.stages[2].heads, 9);
 });

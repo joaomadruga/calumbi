@@ -14,6 +14,7 @@ export type SandboxInput = {
   pregnant: boolean;
   bull: {
     enabled: boolean;
+    quantity: number;
     price: number;
     ageMonths: number;
     weight: number;
@@ -60,6 +61,9 @@ export function simulateInvestment(
   }
   if (quantity > 1000) throw new Error("Simule até 1.000 vacas por vez.");
   if (input.bull.enabled) {
+    number(input.bull.quantity, "a quantidade de bois", 1, 500);
+    if (!Number.isInteger(input.bull.quantity))
+      throw new Error("A quantidade de bois precisa ser inteira.");
     number(input.bull.price, "o preço do boi", 0.01);
     number(input.bull.ageMonths, "a idade do boi", 1, 240);
     if (!Number.isInteger(input.bull.ageMonths))
@@ -94,6 +98,7 @@ export function simulateInvestment(
       },
     })),
   );
+  const bullQuantity = input.bull.enabled ? input.bull.quantity : 0;
   const originalHeads = active(farm).length;
   const afterCowHeads = originalHeads + additions.length;
   if (
@@ -120,14 +125,14 @@ export function simulateInvestment(
       added,
       afterCows,
       bullShare,
-      afterBull: afterCows + bullShare,
+      afterBull: afterCows + bullQuantity * bullShare,
       cowsInvestment:
         (added * Math.round((purchase?.unitPrice ?? 0) * 100)) / 100,
-      bullInvestment: input.bull.enabled ? input.bull.price * bullShare : 0,
+      bullInvestment: 0,
     };
   });
   const bullCost = input.bull.enabled
-    ? Math.round(input.bull.price * 100) / 100
+    ? (bullQuantity * Math.round(input.bull.price * 100)) / 100
     : 0;
   // Allocate whole cents by largest remainder so the displayed shares close exactly.
   const cents = Math.round(bullCost * 100);
@@ -152,14 +157,14 @@ export function simulateInvestment(
         .filter((p) => p.bullShare > 0)
         .map((p) => ({
           id: `simulation-shared-bull-${p.id}`,
-          tag: "Cota do boi",
+          tag: bullQuantity === 1 ? "Cota do boi" : "Cota dos bois",
           owner: p.id,
           sex: "M",
           ageMonths: input.bull.ageMonths,
           birthYear: Number(
             birthFromAge(input.bull.ageMonths, date).slice(0, 4),
           ),
-          count: p.bullShare,
+          count: bullQuantity * p.bullShare,
           weight: input.bull.weight,
           breeder: input.bull.breeder,
           inferred: false,
@@ -186,11 +191,13 @@ export function simulateInvestment(
     {
       id: "bull",
       label: input.bull.enabled
-        ? "Vacas + boi compartilhado"
+        ? bullQuantity === 1
+          ? "Vacas + boi compartilhado"
+          : "Vacas + bois compartilhados"
         : "Resultado do teste",
       animals: [...farm.animals, ...additions],
       extra: seeds,
-      heads: afterCowHeads + (input.bull.enabled ? 1 : 0),
+      heads: afterCowHeads + bullQuantity,
       capital: cowsCost + bullCost,
     },
   ].map((stage) => {
@@ -243,6 +250,7 @@ export function simulateInvestment(
     stages,
     cowsCost,
     bullCost,
+    bullQuantity,
     quantity,
     total: cowsCost + bullCost,
     settings,
@@ -250,7 +258,7 @@ export function simulateInvestment(
       0,
       stages[0].plan.total[0].herd +
         quantity +
-        (input.bull.enabled ? 1 : 0) -
+        bullQuantity -
         settings.capacity,
     ),
   };
