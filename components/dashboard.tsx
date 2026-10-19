@@ -43,7 +43,9 @@ import {
   Video,
   ArrowLeftRight,
   ShoppingCart,
+  FlaskConical,
 } from "lucide-react";
+import InvestmentSandbox from "./investment-sandbox";
 import { ShareChart, HerdChart } from "./charts";
 import {
   type Farm,
@@ -77,6 +79,7 @@ const navigation = [
   { id: "overview", name: "Visão geral", icon: LayoutDashboard },
   { id: "herd", name: "Meu rebanho", icon: Fence },
   { id: "projection", name: "Projeções", icon: TrendingUp },
+  { id: "tests", name: "Testes", icon: FlaskConical },
   { id: "investors", name: "Participantes", icon: Users },
   { id: "finance", name: "Financeiro", icon: Wallet },
   { id: "curral", name: "Câmera do curral", icon: Video },
@@ -95,6 +98,10 @@ const titles: Record<string, [string, string]> = {
   projection: [
     "O futuro começa nas decisões de hoje.",
     "Simule o crescimento do rebanho e o capital necessário para sustentá-lo.",
+  ],
+  tests: [
+    "Experimente as próximas decisões.",
+    "Compare compras por integrante, um boi compartilhado e o capital necessário.",
   ],
   investors: [
     "Uma fazenda. Muitas mãos.",
@@ -563,7 +570,7 @@ export default function Dashboard({
               </h1>
               <p>{titles[tab][tab === "overview" ? 1 : 0]}</p>
             </div>
-            {tab !== "curral" && (
+            {tab !== "curral" && tab !== "tests" && (
               <div className="heading-actions">
                 <button
                   className="button secondary"
@@ -1659,6 +1666,12 @@ export default function Dashboard({
                       />
                     </section>
                   </>
+                )}
+                {tab === "tests" && (
+                  <InvestmentSandbox
+                    key={farm.investors.map((p) => p.id).join(":")}
+                    farm={farm}
+                  />
                 )}
                 {tab === "curral" && <CorralCamera />}
                 {tab === "settings" && (

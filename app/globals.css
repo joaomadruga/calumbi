@@ -4648,3 +4648,255 @@ dd {
 .overview-current-herd {
   margin-bottom: 24px;
 }
+
+.investment-sandbox {
+  display: grid;
+  gap: 22px;
+}
+.investment-sandbox > form {
+  display: grid;
+  gap: 22px;
+}
+.sandbox-card {
+  padding: 25px;
+}
+.sandbox-card h2,
+.sandbox-result-heading h2 {
+  margin: 8px 0 12px;
+  font: 500 25px var(--font-display, Georgia, serif);
+}
+.sandbox-card > p {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.sandbox-orders {
+  display: grid;
+  margin: 22px 0;
+}
+.sandbox-order {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.5fr) minmax(100px, 0.7fr) minmax(
+      140px,
+      1fr
+    ) 110px;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid #eceee4;
+}
+.sandbox-order .field {
+  margin: 0;
+}
+.sandbox-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sandbox-person > i {
+  width: 9px;
+  height: 28px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.sandbox-person strong {
+  display: block;
+  font-size: 13px;
+}
+.sandbox-person small,
+.sandbox-table-sub {
+  display: block;
+  color: #8a9288;
+  font-size: 10px;
+  margin-top: 5px;
+}
+.sandbox-order-total {
+  text-align: right;
+  color: #38564a;
+  font-size: 16px;
+}
+.sandbox-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 22px;
+}
+.sandbox-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 16px 0;
+  cursor: pointer;
+}
+.sandbox-check input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  accent-color: #38564a;
+}
+.sandbox-check small {
+  display: block;
+  color: #899084;
+  font-size: 11px;
+  margin-top: 5px;
+}
+.sandbox-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+.sandbox-form-actions > span {
+  font-size: 11px;
+  color: #a57642;
+}
+.sandbox-results {
+  display: grid;
+  gap: 22px;
+}
+.sandbox-result-heading p {
+  font-size: 12px;
+  color: #858e81;
+}
+.sandbox-stages {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.sandbox-stage {
+  position: relative;
+  text-align: left;
+  padding: 23px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.sandbox-stage.selected {
+  border-color: #63826d;
+  background: #f3f6ed;
+}
+.sandbox-stage > span {
+  display: block;
+  font-size: 11px;
+  color: #818a7b;
+  line-height: 1.8;
+}
+.sandbox-stage > strong {
+  display: block;
+  font-size: 30px;
+  color: #38564a;
+  margin: 12px 0;
+}
+.sandbox-stage > strong small {
+  font-size: 12px;
+  font-weight: 400;
+}
+.sandbox-stage b {
+  font-weight: 500;
+  color: #4a5d4c;
+}
+.sandbox-step-arrow {
+  position: absolute;
+  right: -19px;
+  top: 50%;
+  color: #8b9a84;
+  z-index: 1;
+}
+.sandbox-share-bar {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 22px 0;
+  background: #e9ede3;
+}
+.sandbox-share-bar > span {
+  height: 100%;
+}
+.sandbox-card table {
+  width: 100%;
+}
+.sandbox-card th,
+.sandbox-card td {
+  white-space: nowrap;
+}
+.sandbox-card tfoot {
+  background: #f2f5ec;
+}
+.sandbox-chart-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+}
+.sandbox-chart-heading .field {
+  max-width: 230px;
+  width: 100%;
+}
+.sandbox-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 11px;
+  color: #78816f;
+  margin: 18px 0;
+}
+.sandbox-chart-legend span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sandbox-chart-legend i {
+  width: 20px;
+  height: 3px;
+  border-radius: 3px;
+}
+.sandbox-chart {
+  display: block;
+  width: 100%;
+  max-height: 310px;
+  overflow: visible;
+}
+.sandbox-chart text {
+  fill: #8a9281;
+  font: 10px var(--font);
+}
+.sandbox-annual summary {
+  cursor: pointer;
+  color: #53694f;
+  font-size: 12px;
+  padding: 15px 0;
+}
+@media (max-width: 900px) {
+  .sandbox-order {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sandbox-order-total {
+    text-align: left;
+  }
+  .sandbox-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .sandbox-card {
+    padding: 18px;
+  }
+  .sandbox-stages,
+  .sandbox-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .sandbox-step-arrow {
+    display: none;
+  }
+  .sandbox-chart-heading {
+    flex-wrap: wrap;
+  }
+  .sandbox-chart-heading .field {
+    max-width: none;
+  }
+}

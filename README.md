@@ -122,3 +122,17 @@ Na **Visão geral**, o grafo mostra exclusivamente os animais ativos cadastrados
 Na aba **Projeções**, `projectFromPurchases` reconstrói nascimentos hipotéticos desde a data de compra antes de avançar para o futuro. Assim, a base do ano atual já contém crias esperadas de compras antigas, ainda que não estejam cadastradas. Os nós aparecem como **Inferido**, com mãe e ano, e o primeiro ano mostra nascimentos estimados até hoje. Para os lotes legados da Calumbi, sem idade corrigida, o relato do proprietário é usado somente na simulação: 24 meses na compra em 2023 e 36 meses em 2025; registros com metadados de idade corrigida prevalecem. Não há inferência histórica para outros animais sem data de compra. As matrizes cadastradas são conhecidas como vivas hoje e não são removidas retroativamente por mortalidade simulada. Descendentes inferidas passam por perdas, retenção, venda por idade e limite atual de lotação. A propriedade histórica é atribuída ao participante atual, como hipótese; o modelo não reconcilia nascimentos reais sem vínculo de mãe.
 
 Essa reconstrução ocorre em memória: não cadastra crias, não escreve no Google Sheets e não credita vendas inferidas ao caixa real. As projeções financeiras futuras partem do saldo real atual, considerando o estoque inicial inferido. O relógio reprodutivo avança desde a compra, sem reiniciar a gestação a cada visita à página. A inferência não conhece a fase da prenhez na compra; o primeiro prazo pressupõe uma gestação inteira após a entrada/idade de primeira concepção, quando não existe histórico mais preciso.
+
+## Aba Testes
+
+Abra **Testes** no menu (`/?section=tests`) para simular, sem gravar dados:
+
+1. Quantidade e preço unitário de vacas para cada participante. Idade, peso vivo em kg/@ e prenhez são premissas comuns às novas vacas.
+2. Opcionalmente, um boi compartilhado: preço, peso, idade, finalidade de reprodução ou engorda e divisão igual ou proporcional às cotas após comprar as vacas.
+3. Custo por cabeça, custo fixo mensal e horizonte de 1 a 15 anos, somente para este teste.
+
+O resultado compara situação atual, compras individuais e compras com o boi. Cada pessoa vê compra das vacas, parcela do boi, capital inicial, manutenção mensal, aportes futuros e capital total estimado. A curva compara o rebanho das etapas para toda a fazenda ou um participante. Os valores mostram o último teste calculado, com aviso para recalcular após alterar os campos. O teste é temporário e não é salvo no Sheets ou no navegador.
+
+O boi equivale a uma única cabeça, com frações de propriedade; sua despesa é rateada em centavos pelo método dos maiores restos para fechar o preço total. Reprodutores não entram na regra de venda dos machos nem na venda automática por lotação, mas sofrem a mortalidade configurada. A compra do touro não aumenta automaticamente a natalidade. A aplicação do cadastro continua com propriedade individual; frações compartilhadas são usadas somente no teste.
+
+As compras são financiadas pelos aportes iniciais exibidos no resultado, sem consumir o caixa real. Os aportes futuros são adicionais à compra e seguem o mesmo modelo de receitas, custos, perdas e reserva da projeção. Cotas e manutenção mensal usam o rebanho cadastrado e as novas compras; a curva e os aportes futuros também incluem a inferência de crias desde as compras antigas. A capacidade existente limita o estoque projetado por vendas, e a interface informa quando a compra pressiona essa lotação. Sem cabeças, os custos fixos e aportes são distribuídos igualmente entre os participantes.

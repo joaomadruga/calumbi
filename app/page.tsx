@@ -4,6 +4,7 @@ const sections = new Set([
   "overview",
   "herd",
   "projection",
+  "tests",
   "investors",
   "finance",
   "settings",

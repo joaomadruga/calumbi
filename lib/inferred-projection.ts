@@ -25,6 +25,7 @@ export function projectFromPurchases(
   years = 10,
   now = new Date(),
   purchaseAges: Record<number, number> = {},
+  additionalSeeds: ProjectionInference["seeds"] = [],
 ) {
   // Farm-specific purchase memories are optional and affect only the simulation.
   const f: Farm = {
@@ -177,15 +178,20 @@ export function projectFromPurchases(
       ...c,
       weight: Math.min(c.sex === "F" ? 450 : 550, 30 + c.ageMonths * 7.5),
     }));
+  seeds.push(...additionalSeeds);
   let excess = Math.max(
     0,
     active(f).length + seeds.reduce((n, c) => n + c.count, 0) - s.capacity,
   );
   // Capacity sales are hypothetical; never remove a known registered animal from today's baseline.
-  for (const age of [...new Set(seeds.map((c) => c.ageMonths))].sort(
-    (a, b) => a - b,
-  )) {
-    const group = seeds.filter((c) => c.ageMonths === age),
+  for (const age of [
+    ...new Set(
+      seeds.filter((c) => c.inferred !== false).map((c) => c.ageMonths),
+    ),
+  ].sort((a, b) => a - b)) {
+    const group = seeds.filter(
+        (c) => c.inferred !== false && c.ageMonths === age,
+      ),
       count = group.reduce((n, c) => n + c.count, 0);
     const take = Math.min(excess, count);
     if (count) for (const c of group) c.count *= 1 - take / count;

@@ -152,6 +152,7 @@ export type ProjectedCohort = {
   id: string;
   motherId?: string;
   inferred?: boolean;
+  breeder?: boolean;
   owner: string;
   sex: "F" | "M";
   ageMonths: number;
@@ -193,6 +194,7 @@ export function projectOwnership(
     id: string;
     motherId?: string;
     inferred?: boolean;
+    breeder?: boolean;
     animalId?: string;
     tag?: string;
     sex: "F" | "M";
@@ -228,7 +230,9 @@ export function projectOwnership(
     cohorts.push({
       id: seed.id,
       motherId: seed.motherId,
-      inferred: true,
+      inferred: seed.inferred ?? true,
+      breeder: seed.breeder,
+      tag: seed.tag,
       owner: seed.owner,
       sex: seed.sex,
       age: seed.ageMonths,
@@ -252,6 +256,8 @@ export function projectOwnership(
         id: c.id,
         ...(c.motherId ? { motherId: c.motherId } : {}),
         ...(c.inferred ? { inferred: true } : {}),
+        ...(c.breeder ? { breeder: true } : {}),
+        ...(c.tag ? { tag: c.tag } : {}),
         owner: c.owner,
         sex: c.sex,
         ageMonths: Math.floor(c.age + 1e-8),
@@ -291,7 +297,9 @@ export function projectOwnership(
       ...(inference
         ? {
             inferred: true,
-            inferredHead: inference.seeds.reduce((n, c) => n + c.count, 0),
+            inferredHead: inference.seeds
+              .filter((c) => c.inferred !== false)
+              .reduce((n, c) => n + c.count, 0),
             births: Object.values(inference.birthsByOwner).reduce(
               (n, v) => n + v,
               0,
@@ -306,7 +314,11 @@ export function projectOwnership(
     owners.map((owner) => {
       const animals = cohorts.filter((a) => a.owner === owner),
         heads = animals.reduce((n, c) => n + c.count, 0),
-        share = baseHead ? heads / baseHead : 0;
+        share = baseHead
+          ? heads / baseHead
+          : owners.length
+            ? 1 / owners.length
+            : 0;
       return [
         owner,
         [
@@ -358,8 +370,11 @@ export function projectOwnership(
     let birthGroup = 0;
     for (const c of cohorts) {
       const annualMortality = c.age < 12 ? s.calfMortality : s.mortality;
-      const monthsUntilSale =
-        c.sex === "M" ? s.saleMonths - c.age : s.cullMonths - c.age;
+      const monthsUntilSale = c.breeder
+        ? Infinity
+        : c.sex === "M"
+          ? s.saleMonths - c.age
+          : s.cullMonths - c.age;
       const saleDay = startDay + Math.max(0, monthsUntilSale) * daysPerMonth;
       if (c.sex === "F") {
         while (c.nextBirthDay <= endDay + 1e-8) {
@@ -415,7 +430,7 @@ export function projectOwnership(
     }
     cohorts = [...cohorts, ...newborns].filter((c) => {
       if (
-        (c.sex === "M" && c.age >= s.saleMonths) ||
+        (c.sex === "M" && !c.breeder && c.age >= s.saleMonths) ||
         (c.sex === "F" && c.age >= s.cullMonths)
       ) {
         rows[c.owner].sales += c.count;
@@ -430,11 +445,11 @@ export function projectOwnership(
       0,
       cohorts.reduce((n, c) => n + c.count, 0) - s.capacity,
     );
-    for (const age of [...new Set(cohorts.map((c) => c.age))].sort(
-      (a, b) => a - b,
-    )) {
+    for (const age of [
+      ...new Set(cohorts.filter((c) => !c.breeder).map((c) => c.age)),
+    ].sort((a, b) => a - b)) {
       if (excess <= 1e-9) break;
-      const group = cohorts.filter((c) => c.age === age),
+      const group = cohorts.filter((c) => !c.breeder && c.age === age),
         count = group.reduce((n, c) => n + c.count, 0),
         take = Math.min(excess, count);
       if (!count) continue;
@@ -470,7 +485,11 @@ export function projectOwnership(
     }
     for (const owner of owners) {
       const row = rows[owner];
-      const initialShare = baseHead ? byOwner[owner][0].herd / baseHead : 0;
+      const initialShare = baseHead
+        ? byOwner[owner][0].herd / baseHead
+        : owners.length
+          ? 1 / owners.length
+          : 0;
       const averageShare =
         start + herd
           ? (starts[owner] + row.herd) / (start + herd)
