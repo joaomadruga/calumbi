@@ -59,6 +59,7 @@ import {
   decimal,
   category,
   ageMonths,
+  normalizeSettings,
   animalValue,
 } from "@/lib/model";
 import { applyAction, validateAction } from "@/lib/actions";
@@ -170,6 +171,7 @@ export default function Dashboard({
           }
         } catch {}
         const next = saved ?? demoFarm();
+        next.settings = normalizeSettings(next.settings);
         if (next.settings.name === "Fazenda Boa Vista")
           next.settings.name = "Fazenda Calumbi";
         try {
@@ -250,7 +252,7 @@ export default function Dashboard({
       s.calfMortality = Math.min(100, s.calfMortality * 1.5);
     }
     if (scenario === "good") {
-      s.birthRate = Math.min(95, s.birthRate * 1.1);
+      s.birthRate = Math.min(100, s.birthRate * 1.1);
       s.arroba *= 1.1;
     }
     return projectOwnership({ ...farm, settings: s }, years);
@@ -1372,8 +1374,14 @@ export default function Dashboard({
                         icon={<Fence size={19} />}
                         sub={
                           <span>
-                            Capacidade compartilhada: {farm.settings.capacity}{" "}
-                            cabeças
+                            Ciclo reprodutivo: {farm.settings.postpartumDays}{" "}
+                            dias até a concepção + {farm.settings.gestationDays}{" "}
+                            dias de gestação ={" "}
+                            {farm.settings.postpartumDays +
+                              farm.settings.gestationDays}{" "}
+                            dias entre partos. Sucesso por ciclo:{" "}
+                            {decimal(farm.settings.birthRate)}%. Capacidade
+                            compartilhada: {farm.settings.capacity} cabeças
                           </span>
                         }
                       />
@@ -1720,8 +1728,18 @@ export default function Dashboard({
                               },
                               {
                                 key: "birthRate",
-                                label: "Natalidade anual por matriz (%)",
-                                note: "Proporção das matrizes aptas que geram uma cria no ano.",
+                                label: "Sucesso por ciclo reprodutivo (%)",
+                                note: "Premissa base de 100% dos ciclos gerando uma cria. Ajuste conforme o histórico da fazenda; não é uma garantia de nascimento.",
+                              },
+                              {
+                                key: "postpartumDays",
+                                label: "Do parto à nova concepção (dias)",
+                                note: "Padrão Calumbi: 90 dias. É somado à gestação para o próximo parto.",
+                              },
+                              {
+                                key: "gestationDays",
+                                label: "Duração da gestação (dias)",
+                                note: `Ciclo atual: ${draft.gestationDays + draft.postpartumDays} dias entre partos (aprox. ${decimal((draft.gestationDays + draft.postpartumDays) / 30.4375)} meses).`,
                               },
                               {
                                 key: "mortality",
@@ -1737,7 +1755,8 @@ export default function Dashboard({
                               },
                               {
                                 key: "maturityMonths",
-                                label: "Entrada na reprodução (meses)",
+                                label: "Idade da primeira concepção (meses)",
+                                note: "A primeira cria nasce após esta idade mais o tempo de gestação. Prenhez confirmada dispensa esta espera.",
                               },
                               {
                                 key: "saleMonths",
@@ -1829,12 +1848,14 @@ export default function Dashboard({
                         é uma referência de mercado, sem integração automática.
                       </p>
                       <p>
-                        <strong>Reprodução.</strong> Modelo anual simplificado
-                        por idade, com proporção de sexos de 50%. Fêmeas
-                        elegíveis no início do ano geram crias conforme a
-                        natalidade. Novas fêmeas entram na reprodução após a
-                        maturidade configurada. O modelo não acompanha gestação
-                        individual. A{" "}
+                        <strong>Reprodução.</strong> A simulação acompanha o
+                        prazo de cada cria em dias e resume os resultados por
+                        ano. O ciclo entre partos soma o tempo até a nova
+                        concepção e a gestação. Fêmeas jovens aguardam a idade
+                        da primeira concepção mais a gestação. Para prenhez
+                        confirmada sem data prevista de parto, assume-se uma
+                        gestação inteira a partir de hoje. A proporção de sexos
+                        é de 50%. A{" "}
                         <a
                           href="https://cloud.cnpgc.embrapa.br/sac/2012/04/02/qual-e-a-duracao-da-gestacao-e-qual-o-intervalo-medio-entre-partos-em-gado-de-corte/"
                           target="_blank"

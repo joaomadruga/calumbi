@@ -59,11 +59,15 @@ test("projected births start as newborns and retain their birth year as they gro
     ],
     settings: { ...farm.settings, birthRate: 100 },
   };
-  const plan = projectOwnership(breeder, 4, now),
-    id = "projected-a-2027-F";
+  const plan = projectOwnership(breeder, 4, now);
+  const born = plan.cohortsByYear[2027].find((c) =>
+    c.id.startsWith("projected-a-2027-F"),
+  )!;
+  const id = born.id;
+  assert.ok(born.ageMonths >= 0 && born.ageMonths < 12);
   for (let i = 0; i < 4; i++) {
     const cohort = plan.cohortsByYear[2027 + i].find((c) => c.id === id)!;
-    assert.equal(cohort.ageMonths, i * 12);
+    assert.equal(cohort.ageMonths, born.ageMonths + i * 12);
     assert.equal(cohort.birthYear, 2027);
     assert.equal(cohort.animalId, undefined);
   }

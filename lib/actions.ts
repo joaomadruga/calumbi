@@ -86,7 +86,12 @@ export function validateAction(input: unknown, f: Farm): Action {
         : key === "capacity"
           ? 10000
           : 1e8;
-      s[key] = number(data[key], key, 0, max);
+      const value =
+        (key === "gestationDays" || key === "postpartumDays") &&
+        data[key] === undefined
+          ? s[key]
+          : data[key];
+      s[key] = number(value, key, 0, max);
     }
     if (
       !s.arroba ||
@@ -94,7 +99,11 @@ export function validateAction(input: unknown, f: Farm): Action {
       !s.capacity ||
       !s.maturityMonths ||
       !s.saleMonths ||
-      s.cullMonths <= s.maturityMonths
+      s.cullMonths <= s.maturityMonths ||
+      s.maturityMonths < 12 ||
+      s.gestationDays < 200 ||
+      s.gestationDays > 330 ||
+      s.postpartumDays > 365
     )
       return fail("Revise preços, capacidade e idades de reprodução/descarte.");
     return { type, data: s };

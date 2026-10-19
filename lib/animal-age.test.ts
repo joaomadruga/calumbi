@@ -44,6 +44,7 @@ test("estimated birth uses age at assessment, independently of the purchase date
   assert.equal(a.data.details?.acquiredAt, "2026-10-01");
   assert.equal(ageMonths(a.data.born, new Date("2027-10-18T12:00:00Z")), 24);
   const checked = validateAction(a, f);
+  if (checked.type !== "animal") throw new Error("Expected animal");
   assert.deepEqual(checked.data, { ...a.data, id: checked.data.id });
   const next = applyAction(f, a);
   const cohorts = projectOwnership(

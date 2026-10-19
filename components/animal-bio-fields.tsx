@@ -150,8 +150,9 @@ export default function AnimalBioFields({
           <option value="not-pregnant">Não prenhe</option>
         </select>
         <small>
-          Prenhez confirmada entra como nascimento esperado no próximo ciclo
-          anual da projeção, sujeito às perdas do modelo. Inseminação sem
+          Prenhez confirmada entra como nascimento esperado dentro do tempo de
+          gestação configurado. Como a fase da gestação não é informada, a
+          projeção assume uma gestação inteira a partir de hoje. Inseminação sem
           confirmação não garante nascimento. Não altera a idade.
         </small>
       </label>

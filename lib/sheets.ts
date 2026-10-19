@@ -7,6 +7,7 @@ import {
   type Settings,
   type Movement,
   defaultSettings,
+  normalizeSettings,
 } from "./model.ts";
 import { type Action } from "./actions.ts";
 export const configured = () =>
@@ -146,6 +147,7 @@ export async function readFarm(): Promise<Farm> {
   const objects = (i: number, keys: string[]) =>
     rows(i).map((r) => Object.fromEntries(keys.map((k, j) => [k, r[j] ?? ""])));
   const settings = { ...defaultSettings };
+  const settingKeys = new Set(rows(3).map(([key]) => key));
   for (const [k, v] of rows(3)) {
     if (typeof k === "string" && k in settings) {
       const key = k as keyof Settings;
@@ -166,7 +168,15 @@ export async function readFarm(): Promise<Farm> {
       ...t,
       amount: Number(t.amount),
     })) as Transaction[],
-    settings,
+    settings: normalizeSettings({
+      ...settings,
+      ...(!settingKeys.has("gestationDays")
+        ? { gestationDays: undefined }
+        : {}),
+      ...(!settingKeys.has("postpartumDays")
+        ? { postpartumDays: undefined }
+        : {}),
+    }),
     movements: hasMovements
       ? (objects(4, headers.Movimentacoes).map((m) => ({
           ...m,

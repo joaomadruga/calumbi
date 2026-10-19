@@ -42,6 +42,8 @@ export type Settings = {
   arroba: number;
   yield: number;
   birthRate: number;
+  gestationDays: number;
+  postpartumDays: number;
   mortality: number;
   calfMortality: number;
   maturityMonths: number;
@@ -169,8 +171,11 @@ export function projectOwnership(
   byOwner: Record<string, Projection[]>;
   cohortsByYear: Record<number, ProjectedCohort[]>;
 } {
-  const s = f.settings,
+  const s = normalizeSettings(f.settings),
     base = summary(f, now);
+  const daysPerYear = 365.25,
+    daysPerMonth = daysPerYear / 12;
+  const cycleDays = s.gestationDays + s.postpartumDays;
   let cash = base.cash;
   type Cohort = {
     id: string;
@@ -183,6 +188,7 @@ export function projectOwnership(
     weight: number;
     owner: string;
     pregnant?: boolean;
+    nextBirthDay: number;
   };
   let cohorts: Cohort[] = active(f).map((a) => ({
     id: a.id,
@@ -195,6 +201,11 @@ export function projectOwnership(
     weight: a.weight,
     owner: a.owner,
     pregnant: a.details?.reproductiveStatus === "pregnant",
+    nextBirthDay:
+      (a.details?.reproductiveStatus === "pregnant"
+        ? 0
+        : Math.max(0, s.maturityMonths - ageMonths(a.born, now)) *
+          daysPerMonth) + s.gestationDays,
   }));
   const cohortsByYear: Record<number, ProjectedCohort[]> = {};
   const saveCohorts = (year: number) => {
@@ -204,7 +215,7 @@ export function projectOwnership(
         id: c.id,
         owner: c.owner,
         sex: c.sex,
-        ageMonths: c.age,
+        ageMonths: Math.floor(c.age + 1e-8),
         birthYear: c.birthYear,
         count: c.count,
         ...(c.animalId ? { animalId: c.animalId, tag: c.tag } : {}),
@@ -278,28 +289,67 @@ export function projectOwnership(
     const losses: Record<string, number> = Object.fromEntries(
       owners.map((owner) => [owner, 0]),
     );
+    const startDay = (y - 1) * daysPerYear,
+      endDay = y * daysPerYear;
+    const newborns: Cohort[] = [];
+    let birthGroup = 0;
     for (const c of cohorts) {
-      if (c.sex !== "F") continue;
-      if (y === 1 && c.pregnant) rows[c.owner].births += c.count;
-      else if (c.age >= s.maturityMonths && c.age < s.cullMonths)
-        rows[c.owner].births += (c.count * s.birthRate) / 100;
-    }
-    cohorts = cohorts.map((c) => {
-      const died =
-        (c.count * (c.age < 12 ? s.calfMortality : s.mortality)) / 100;
+      const annualMortality = c.age < 12 ? s.calfMortality : s.mortality;
+      const monthsUntilSale =
+        c.sex === "M" ? s.saleMonths - c.age : s.cullMonths - c.age;
+      const saleDay = startDay + Math.max(0, monthsUntilSale) * daysPerMonth;
+      if (c.sex === "F") {
+        while (c.nextBirthDay <= endDay + 1e-8) {
+          const due = c.nextBirthDay;
+          c.nextBirthDay += cycleDays;
+          // A mother sold before the due date cannot produce another calf.
+          if (due >= saleDay) continue;
+          const elapsed = Math.max(0, due - startDay) / daysPerYear;
+          const mothers = c.count * (1 - annualMortality / 100) ** elapsed;
+          const births = mothers * (c.pregnant ? 1 : s.birthRate / 100);
+          c.pregnant = false;
+          if (births <= 1e-9) continue;
+          rows[c.owner].births += births;
+          const dead = (births * s.calfMortality) / 100;
+          rows[c.owner].deaths += dead;
+          losses[c.owner] += dead * animalValue(30, s);
+          const females = (births - dead) / 2,
+            retained = (females * s.femaleRetention) / 100;
+          rows[c.owner].sales += females - retained;
+          rows[c.owner].revenue += (females - retained) * animalValue(180, s);
+          const age = Math.max(0, (endDay - due) / daysPerMonth);
+          const birthYear = new Date(
+            now.getTime() + due * 86400000,
+          ).getUTCFullYear();
+          const group = birthGroup++;
+          for (const sex of ["F", "M"] as const) {
+            const count = sex === "F" ? retained : females;
+            if (!count) continue;
+            newborns.push({
+              id: `projected-${c.owner}-${year}-${sex}-${group}`,
+              birthYear,
+              sex,
+              age,
+              count,
+              weight: 30 + age * 7.5,
+              owner: c.owner,
+              nextBirthDay:
+                due + s.maturityMonths * daysPerMonth + s.gestationDays,
+            });
+          }
+        }
+      }
+      const died = (c.count * annualMortality) / 100;
       rows[c.owner].deaths += died;
       losses[c.owner] += died * animalValue(c.weight, s);
-      return {
-        ...c,
-        count: c.count - died,
-        age: c.age + 12,
-        weight: Math.max(
-          c.weight,
-          Math.min(c.sex === "F" ? 450 : 550, c.weight + 90),
-        ),
-      };
-    });
-    cohorts = cohorts.filter((c) => {
+      c.count -= died;
+      c.age += 12;
+      c.weight = Math.max(
+        c.weight,
+        Math.min(c.sex === "F" ? 450 : 550, c.weight + 90),
+      );
+    }
+    cohorts = [...cohorts, ...newborns].filter((c) => {
       if (
         (c.sex === "M" && c.age >= s.saleMonths) ||
         (c.sex === "F" && c.age >= s.cullMonths)
@@ -308,37 +358,8 @@ export function projectOwnership(
         rows[c.owner].revenue += c.count * animalValue(c.weight, s);
         return false;
       }
-      return true;
+      return c.count > 1e-9;
     });
-    for (const owner of owners) {
-      const dead = (rows[owner].births * s.calfMortality) / 100;
-      rows[owner].deaths += dead;
-      losses[owner] += dead * animalValue(120, s);
-      const females = (rows[owner].births - dead) / 2,
-        retained = (females * s.femaleRetention) / 100;
-      rows[owner].sales += females - retained;
-      rows[owner].revenue += (females - retained) * animalValue(180, s);
-      cohorts.push(
-        {
-          id: `projected-${owner}-${year}-F`,
-          birthYear: year,
-          sex: "F",
-          age: 0,
-          count: retained,
-          weight: 120,
-          owner,
-        },
-        {
-          id: `projected-${owner}-${year}-M`,
-          birthYear: year,
-          sex: "M",
-          age: 0,
-          count: females,
-          weight: 120,
-          owner,
-        },
-      );
-    }
     // Sell the youngest cohorts first, proportionally across owners of the same
     // age. Investor ordering must never decide who loses stock at capacity.
     let excess = Math.max(
@@ -427,7 +448,9 @@ export const defaultSettings: Settings = {
   location: "Agreste · Pernambuco",
   arroba: 375,
   yield: 50,
-  birthRate: 78,
+  birthRate: 100,
+  gestationDays: 295,
+  postpartumDays: 90,
   mortality: 2,
   calfMortality: 5,
   maturityMonths: 36,
@@ -516,5 +539,29 @@ export function demoFarm(): Farm {
         investor: "joao",
       },
     ],
+  };
+}
+
+/** Upgrade the original 78% example only when the new cycle parameters are absent. */
+export function normalizeSettings(settings: Partial<Settings>): Settings {
+  const legacy =
+    settings.gestationDays === undefined &&
+    settings.postpartumDays === undefined;
+  return {
+    ...defaultSettings,
+    ...settings,
+    gestationDays:
+      Number.isFinite(settings.gestationDays) &&
+      settings.gestationDays! >= 200 &&
+      settings.gestationDays! <= 330
+        ? settings.gestationDays!
+        : defaultSettings.gestationDays,
+    postpartumDays:
+      Number.isFinite(settings.postpartumDays) &&
+      settings.postpartumDays! >= 0 &&
+      settings.postpartumDays! <= 365
+        ? settings.postpartumDays!
+        : defaultSettings.postpartumDays,
+    ...(legacy && settings.birthRate === 78 ? { birthRate: 100 } : {}),
   };
 }
