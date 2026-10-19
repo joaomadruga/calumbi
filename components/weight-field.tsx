@@ -5,12 +5,14 @@ export default function WeightField({
   initialKg = 0,
   initialUnit = "kg",
   required = false,
+  label,
   yieldPercent,
   onWeightChange,
 }: {
   initialKg?: number;
   initialUnit?: WeightUnit;
   required?: boolean;
+  label?: string;
   yieldPercent: number;
   onWeightChange?: (kg: number) => void;
 }) {
@@ -38,7 +40,9 @@ export default function WeightField({
   }, [kg, onWeightChange]);
   return (
     <label className="field weight-field">
-      <span>{required ? "Peso por animal" : "Peso por animal (opcional)"}</span>
+      <span>
+        {label ?? (required ? "Peso por animal" : "Peso por animal (opcional)")}
+      </span>
       <select
         aria-label="Unidade e tipo de peso"
         value={unit}

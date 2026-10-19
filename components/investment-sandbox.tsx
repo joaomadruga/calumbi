@@ -31,9 +31,7 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
       owner: p.id,
       quantity: 0,
       unitPrice: 0,
-      ageMonths: 18,
       weight: 15000 / farm.settings.yield,
-      breedingWeightKg: 15000 / farm.settings.yield,
       pregnant: false,
     })),
     cowAgeMonths: 36,
@@ -242,9 +240,7 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
                         owner: person.id,
                         quantity: 0,
                         unitPrice: 0,
-                        ageMonths: 18,
                         weight: 15000 / farm.settings.yield,
-                        breedingWeightKg: 15000 / farm.settings.yield,
                         pregnant: false,
                       },
                     ],
@@ -265,10 +261,10 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
             <p className="form-note">
               Exemplo: um lote com 5 fêmeas de 6@ e outro com 10 fêmeas de 10@,
               ambos com início de reprodução em 10@. O primeiro precisa crescer;
-              o segundo já pode iniciar a gestação. O peso para reprodução é uma
-              premissa sua, editável por lote. Idade e peso não confirmam
-              fertilidade. O prazo até atingir o peso usa o ganho diário
-              informado neste teste.
+              o segundo já pode iniciar a gestação. A reprodução começa sempre
+              em 10@ de carcaça. Informe o peso de chegada; o prazo de
+              crescimento usa o ganho diário do teste. A idade exibida no grafo
+              é aproximada, estimada pelo peso.
             </p>
           </details>
         </section>
@@ -1026,7 +1022,7 @@ function PurchaseLot({
     (weight: number) => update(row.id!, { weight }),
     [row.id, update],
   );
-  const minimumKg = row.breedingWeightKg ?? 15000 / yieldPercent;
+  const minimumKg = 15000 / yieldPercent;
   const ready = (row.weight ?? 0) >= minimumKg;
   return (
     <div className="sandbox-lot">
@@ -1089,45 +1085,11 @@ function PurchaseLot({
         <WeightField
           initialKg={row.weight}
           initialUnit="arroba-carcaca"
+          label="Peso de chegada por animal"
           required={row.quantity > 0}
           yieldPercent={yieldPercent}
           onWeightChange={onWeight}
         />
-        <label className="field">
-          <span>Idade na compra (meses)</span>
-          <input
-            type="number"
-            min="1"
-            max="180"
-            step="1"
-            required
-            value={row.ageMonths}
-            onChange={(e) =>
-              update(row.id!, { ageMonths: Number(e.target.value) })
-            }
-          />
-        </label>
-        <label className="field">
-          <span>Reprodução a partir de (@ carcaça)</span>
-          <input
-            type="number"
-            min=".1"
-            max={(450 * yieldPercent) / 1500}
-            step="any"
-            required
-            value={Number(((minimumKg * yieldPercent) / 1500).toFixed(6))}
-            onChange={(e) =>
-              update(row.id!, {
-                breedingWeightKg:
-                  (Number(e.target.value) * 1500) / yieldPercent,
-              })
-            }
-          />
-          <small>
-            {decimal(minimumKg)} kg vivos com rendimento de{" "}
-            {decimal(yieldPercent)}%.
-          </small>
-        </label>
         <label className="sandbox-check">
           <input
             type="checkbox"
@@ -1148,8 +1110,8 @@ function PurchaseLot({
           {row.pregnant
             ? "Gestação informada na compra"
             : ready
-              ? "Pode iniciar a reprodução no cenário"
-              : "Cresce até atingir o peso de reprodução"}
+              ? "Atingiu 10@ · pode iniciar a reprodução"
+              : "Cresce até 10@ antes da reprodução"}
         </span>
         <div>
           <small>Total do lote</small>

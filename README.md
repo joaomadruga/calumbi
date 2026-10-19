@@ -127,7 +127,7 @@ Essa reconstrução ocorre em memória: não cadastra crias, não escreve no Goo
 
 Abra **Testes** no menu (`/?section=tests`) para simular, sem gravar dados:
 
-1. Vários lotes de fêmeas por participante, com quantidade, preço unitário, idade, peso em kg/@, prenhez e peso de início de reprodução independentes. Use **Adicionar lote** para misturar categorias na mesma compra.
+1. Vários lotes de fêmeas por participante, com quantidade, preço unitário, peso de chegada em kg/@ e prenhez independentes. Use **Adicionar lote** para misturar categorias na mesma compra.
 2. Opcionalmente, um lote de 1 a 500 bois compartilhados: quantidade, preço por animal, peso e idade por animal, finalidade de reprodução ou engorda e divisão igual ou proporcional às cotas após comprar as vacas.
 3. Custo por cabeça, custo fixo mensal e horizonte de 1 a 15 anos, somente para este teste.
 
@@ -151,8 +151,8 @@ A receita bruta é dividida em caixa retido e distribuição ao dono dos animais
 
 ### Lotes com fases de reprodução diferentes
 
-Cada participante pode comprar, por exemplo, um lote de 5 fêmeas de 6@ e outro de 10 fêmeas de 10@. Cada lote possui peso e idade próprios, e o campo **Iniciar reprodução com (@ de carcaça)** começa em 10@, como premissa editável do teste. Com rendimento de 50%, os pesos são respectivamente 180 e 300 kg vivos; o seletor de peso permite escolher outra base.
+Cada participante pode comprar um lote de 5 fêmeas de 6@ e outro de 10 fêmeas de 10@, informando o peso de chegada por animal. Não há campos para idade de compra ou limite reprodutivo: o início da reprodução é sempre em **10@ de carcaça**, convertido para kg vivos pelo rendimento da fazenda.
 
-Para esses lotes, a primeira gestação começa depois de atingir o peso informado, usando o ganho diário do cenário: dias de espera = máximo(0, peso de reprodução − peso atual) ÷ ganho diário. A primeira cria chega após essa espera mais os dias de gestação. Se a prenhez já foi informada, não há espera por crescimento; considera-se o prazo completo de gestação. As próximas crias usam o intervalo entre partos cadastrado. A idade serve para o grafo, mortalidade e descarte; o peso de reprodução informado por lote substitui a idade genérica de primeira concepção apenas nessas compras. Não é uma confirmação biológica de fertilidade.
+O primeiro lote espera crescer até 10@; o segundo pode iniciar a gestação. Dias de espera = máximo(0, peso equivalente a 10@ − peso de chegada) ÷ ganho diário. Após essa espera, soma-se a gestação. Prenhez informada ignora a espera, mantendo o prazo completo de gestação. As próximas crias seguem o intervalo entre partos cadastrado.
 
-As fêmeas de reposição compradas não são revendidas automaticamente como crias, mesmo quando jovens: permanecem para reprodução. Seus descendentes seguem a venda anual a partir de 6@. Lotação e descarte ainda podem exigir venda das matrizes. Custos, cotas, rateio dos bois e retorno somam todos os lotes de cada proprietário; IDs de animais simulados são únicos mesmo com vários lotes para a mesma pessoa.
+A idade no grafo é estimada pelo peso usando a referência aproximada do sistema. Acima da faixa de crescimento, usa-se uma idade adulta de referência de 36 meses; isso afeta visualização, mortalidade e descarte, mas não muda o limiar fixo de 10@. As fêmeas compradas permanecem para formar matrizes; suas crias seguem a venda anual. Lotação e descarte ainda podem exigir venda de matrizes.

@@ -7,17 +7,15 @@ import {
   type Animal,
   type ProjectionInference,
 } from "./model.ts";
-import { birthFromAge } from "./animal-age.ts";
+import { birthFromAge, suggestAgeMonths } from "./animal-age.ts";
 import { projectFromPurchases } from "./inferred-projection.ts";
 export type SandboxPurchase = {
   id?: string;
   owner: string;
   quantity: number;
   unitPrice: number;
-  ageMonths?: number;
   weight?: number;
   pregnant?: boolean;
-  breedingWeightKg?: number;
 };
 export type SandboxInput = {
   purchases: SandboxPurchase[];
@@ -70,17 +68,12 @@ export function simulateInvestment(
     )
       throw new Error("Participante inválido ou lote repetido.");
     seen.add(lotKey);
-    number(p.ageMonths ?? input.cowAgeMonths, "a idade do lote", 1, 180);
-    if (!Number.isInteger(p.ageMonths ?? input.cowAgeMonths))
-      throw new Error("Use meses inteiros para o lote.");
     number(
       p.weight ?? input.cowWeight,
-      "o peso do lote",
-      p.quantity && p.breedingWeightKg !== undefined ? 0.01 : 0,
+      "o peso de chegada do lote",
+      p.quantity && p.id ? 0.01 : 0,
       1500,
     );
-    if (p.breedingWeightKg !== undefined)
-      number(p.breedingWeightKg, "o peso para reprodução", 1, 450);
     number(p.quantity, "a quantidade", 0, 500);
     if (!Number.isInteger(p.quantity))
       throw new Error("A quantidade precisa ser inteira.");
@@ -120,6 +113,14 @@ export function simulateInvestment(
     ...(input.sales ? { capacity: input.sales.capacity } : {}),
   };
   const date = now.toISOString().slice(0, 10);
+  // Ages are approximate display/culling inputs; first conception follows the fixed weight rule.
+  const purchaseAge = (p: SandboxPurchase) =>
+    p.id
+      ? (suggestAgeMonths(p.weight ?? input.cowWeight) ??
+        ((p.weight ?? input.cowWeight) > 327.54 ? 36 : 1))
+      : input.cowAgeMonths;
+  const breedingWeightKg = 15000 / settings.yield; // 10 arrobas of estimated carcass.
+
   const purchaseProjection: PurchaseProjection = {
     clocks: {},
     retainedFemales: [],
@@ -129,13 +130,13 @@ export function simulateInvestment(
       id: `simulation-cow-${p.owner}-${lotIndex}-${i}`,
       tag: "",
       sex: "F" as const,
-      born: birthFromAge(p.ageMonths ?? input.cowAgeMonths, date),
+      born: birthFromAge(purchaseAge(p), date),
       weight: p.weight ?? input.cowWeight,
       owner: p.owner,
       status: "ativo" as const,
       details: {
-        birthSource: "estimated" as const,
-        estimatedMonths: p.ageMonths ?? input.cowAgeMonths,
+        birthSource: p.id ? ("weight" as const) : ("estimated" as const),
+        estimatedMonths: purchaseAge(p),
         ageReferenceDate: date,
         acquiredAt: date,
         reproductiveStatus:
@@ -146,13 +147,13 @@ export function simulateInvestment(
     })),
   );
   input.purchases.forEach((p, lotIndex) => {
-    if (p.breedingWeightKg === undefined) return;
+    if (!p.id) return;
     for (let i = 0; i < p.quantity; i++) {
       const id = `simulation-cow-${p.owner}-${lotIndex}-${i}`;
       const waitDays =
         (p.pregnant ?? input.pregnant)
           ? 0
-          : Math.max(0, p.breedingWeightKg - (p.weight ?? input.cowWeight)) /
+          : Math.max(0, breedingWeightKg - (p.weight ?? input.cowWeight)) /
             (input.sales?.dailyGain ?? 90 / 365.25);
       purchaseProjection.clocks[id] = waitDays + settings.gestationDays;
       purchaseProjection.retainedFemales.push(id);
