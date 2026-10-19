@@ -4096,11 +4096,12 @@ dd {
 .radial-time-control {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 17px;
   padding: 22px 23px 17px;
 }
 .radial-time-control > div {
-  flex: 1;
+  flex: 0 1 280px;
   min-width: 0;
 }
 .radial-time-control label {
@@ -4127,6 +4128,7 @@ dd {
   cursor: pointer;
 }
 .radial-time-control .icon-button {
+  flex-shrink: 0;
   border: 1px solid #e7e4ee;
   color: #9d96b2;
   background: #faf9fc;

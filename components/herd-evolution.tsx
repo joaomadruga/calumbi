@@ -702,7 +702,7 @@ export default function HerdEvolution({
         <div>
           <label htmlFor="herd-year-range">
             {data[0].year}
-            <span>Deslize para explorar os anos</span>
+            <span>Ano {snapshot.year}</span>
             {data.at(-1)?.year}
           </label>
           <input
