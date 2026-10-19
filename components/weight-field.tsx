@@ -37,7 +37,7 @@ export default function WeightField({
     onWeightChange?.(kg);
   }, [kg, onWeightChange]);
   return (
-    <label className="field">
+    <label className="field weight-field">
       <span>{required ? "Peso por animal" : "Peso por animal (opcional)"}</span>
       <select
         aria-label="Unidade e tipo de peso"

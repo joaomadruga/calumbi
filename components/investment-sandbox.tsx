@@ -4,7 +4,9 @@ import {
   FlaskConical,
   ArrowRight,
   RotateCcw,
-  ShoppingCart,
+  Plus,
+  Trash2,
+  ArrowUpRight,
 } from "lucide-react";
 import { active, decimal, type Farm } from "@/lib/model";
 import {
@@ -112,14 +114,58 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
     setDraft((p) => ({ ...p, bull: { ...p.bull, [key]: value } }));
   return (
     <div className="investment-sandbox">
-      <div className="section-callout">
-        <FlaskConical size={26} />
+      <div className="sandbox-hero">
+        <div className="sandbox-hero-copy">
+          <span className="sandbox-hero-icon">
+            <FlaskConical size={23} />
+          </span>
+          <div>
+            <span className="section-eyebrow">LABORATÓRIO CALUMBI</span>
+            <h2>Seu próximo investimento começa aqui.</h2>
+            <p>
+              Monte os lotes. Compare os cenários. Veja o futuro da fazenda.
+            </p>
+          </div>
+        </div>
+        <span className="sandbox-safe">Simulação · sem alterar a fazenda</span>
+      </div>
+      <div
+        className="sandbox-overview"
+        aria-label="Resumo das compras do teste"
+      >
         <div>
-          <strong>Experimente antes de investir.</strong>
-          <p>
-            Monte compras por integrante e compare o custo antes e depois. Nada
-            neste teste altera animais, premissas ou caixa da fazenda.
-          </p>
+          <span>Fêmeas nos lotes</span>
+          <strong>
+            {draft.purchases.reduce((n, p) => n + p.quantity, 0)}{" "}
+            <small>cabeças</small>
+          </strong>
+        </div>
+        <div>
+          <span>Bois compartilhados</span>
+          <strong>
+            {draft.bull.enabled ? draft.bull.quantity : 0}{" "}
+            <small>cabeças</small>
+          </strong>
+        </div>
+        <div>
+          <span>Compra estimada</span>
+          <strong>
+            {cash(
+              draft.purchases.reduce(
+                (n, p) => n + p.quantity * p.unitPrice,
+                0,
+              ) +
+                (draft.bull.enabled
+                  ? draft.bull.quantity * draft.bull.price
+                  : 0),
+            )}
+          </strong>
+        </div>
+        <div>
+          <span>Horizonte do teste</span>
+          <strong>
+            {draft.years} <small>anos</small>
+          </strong>
         </div>
       </div>
       <form
@@ -129,25 +175,38 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
         }}
       >
         <section className="card sandbox-card">
-          <span className="section-eyebrow">
-            1 · VACAS PARA CADA PARTICIPANTE
-          </span>
-          <h2>Quem quer comprar mais gado?</h2>
+          <span className="section-eyebrow">01 / COMPRAS INDIVIDUAIS</span>
+          <h2>Um plano para cada participante.</h2>
           <p className="muted">
-            Adicione quantos lotes precisar para cada participante. Cada lote
-            tem seu próprio peso, idade, preço e início da reprodução. As fêmeas
-            compradas ficam para formar matrizes; suas crias seguem a venda
-            anual do teste.
+            Separe as fêmeas em lotes por peso e fase de reprodução. Você pode
+            combinar vários lotes para a mesma pessoa.
           </p>
           {farm.investors.map((person) => (
             <div key={person.id} className="sandbox-orders">
-              <div className="sandbox-person">
-                <i style={{ background: person.color }} />
-                <span>
-                  <strong>{person.name}</strong>
+              <div className="sandbox-owner-heading">
+                <div className="sandbox-person">
+                  <i style={{ background: person.color }} />
+                  <span>
+                    <strong>{person.name}</strong>
+                    <small>
+                      {active(farm).filter((a) => a.owner === person.id).length}{" "}
+                      animais cadastrados hoje
+                    </small>
+                  </span>
+                </div>
+                <span className="sandbox-owner-total">
+                  <strong>
+                    {cash(
+                      draft.purchases
+                        .filter((p) => p.owner === person.id)
+                        .reduce((n, p) => n + p.quantity * p.unitPrice, 0),
+                    )}
+                  </strong>
                   <small>
-                    {active(farm).filter((a) => a.owner === person.id).length}{" "}
-                    animais cadastrados hoje
+                    {draft.purchases
+                      .filter((p) => p.owner === person.id)
+                      .reduce((n, p) => n + p.quantity, 0)}{" "}
+                    fêmeas no teste
                   </small>
                 </span>
               </div>
@@ -172,7 +231,7 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
                 ))}
               <button
                 type="button"
-                className="button secondary"
+                className="sandbox-add-lot"
                 onClick={() =>
                   setDraft((p) => ({
                     ...p,
@@ -192,7 +251,7 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
                   }))
                 }
               >
-                + Adicionar lote para {person.name}
+                <Plus size={15} /> Adicionar lote
               </button>
             </div>
           ))}
@@ -201,18 +260,21 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
               Cadastre participantes na aba Participantes para começar.
             </p>
           )}
-          <p className="form-note">
-            Exemplo: um lote com 5 fêmeas de 6@ e outro com 10 fêmeas de 10@,
-            ambos com início de reprodução em 10@. O primeiro precisa crescer; o
-            segundo já pode iniciar a gestação. O peso para reprodução é uma
-            premissa sua, editável por lote. Idade e peso não confirmam
-            fertilidade. O prazo até atingir o peso usa o ganho diário informado
-            neste teste.
-          </p>
+          <details className="sandbox-help">
+            <summary>Exemplo: combinando lotes de 6@ e 10@</summary>
+            <p className="form-note">
+              Exemplo: um lote com 5 fêmeas de 6@ e outro com 10 fêmeas de 10@,
+              ambos com início de reprodução em 10@. O primeiro precisa crescer;
+              o segundo já pode iniciar a gestação. O peso para reprodução é uma
+              premissa sua, editável por lote. Idade e peso não confirmam
+              fertilidade. O prazo até atingir o peso usa o ganho diário
+              informado neste teste.
+            </p>
+          </details>
         </section>
         <section className="card sandbox-card">
-          <span className="section-eyebrow">2 · BOIS COMPARTILHADOS</span>
-          <h2>E se todo mundo comprasse junto?</h2>
+          <span className="section-eyebrow">02 / COMPRA COMPARTILHADA</span>
+          <h2>Bois para o grupo.</h2>
           <label className="sandbox-check">
             <input
               type="checkbox"
@@ -310,8 +372,8 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
           </p>
         </section>
         <section className="card sandbox-card">
-          <span className="section-eyebrow">3 · TEMPO E MANUTENÇÃO</span>
-          <h2>Quanto custa sustentar a decisão?</h2>
+          <span className="section-eyebrow">03 / PREMISSAS DO CENÁRIO</span>
+          <h2>Tempo, custos e estratégia de venda.</h2>
           <div className="sandbox-form-grid">
             <label className="field">
               <span>Custo mensal por cabeça (R$)</span>
@@ -368,7 +430,10 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
             afeta somente este teste. A compra considera novos aportes dos
             participantes, sem usar o caixa atual.
           </p>
-          <h2>Venda anual e retorno</h2>
+          <div className="sandbox-subheading">
+            <span>ESTRATÉGIA DE VENDA</span>
+            <p>Defina o que volta para você e o que fica na fazenda.</p>
+          </div>
           <div className="sandbox-form-grid">
             {(
               [
@@ -435,33 +500,36 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
               </select>
             </label>
           </div>
-          <p className="form-note">
-            Venda uma vez por ano de todas as crias que atingirem pelo menos 6@,
-            machos e fêmeas. Abaixo disso, continuam no rebanho. As matrizes
-            ficam; excesso de lotação gera vendas adicionais, preservando
-            reprodutores e o peso mínimo. Novilhas são fêmeas de 12 a 35 meses;
-            demais adultos usam a arroba cadastrada da fazenda. Preços
-            permanecem constantes. Na base carcaça, 6@ equivalem a{" "}
-            {decimal(90 / (farm.settings.yield / 100))} kg vivos com rendimento
-            de {decimal(farm.settings.yield)}%. Ganho de peso é uma premissa
-            aproximada, aplicada a todos os animais até o limite de peso do
-            modelo.
-            <a
-              href="https://www.infoteca.cnptia.embrapa.br/infoteca/bitstream/doc/920741/1/500perguntasgadodecorte.pdf"
-              target="_blank"
-              rel="noreferrer"
-            >
-              {" "}
-              Referência da conversão: Embrapa.
-            </a>
-          </p>
+          <details className="sandbox-help">
+            <summary>Regras de venda e conversão de arrobas</summary>
+            <p className="form-note">
+              Venda uma vez por ano de todas as crias que atingirem pelo menos
+              6@, machos e fêmeas. Abaixo disso, continuam no rebanho. As
+              matrizes ficam; excesso de lotação gera vendas adicionais,
+              preservando reprodutores e o peso mínimo. Novilhas são fêmeas de
+              12 a 35 meses; demais adultos usam a arroba cadastrada da fazenda.
+              Preços permanecem constantes. Na base carcaça, 6@ equivalem a{" "}
+              {decimal(90 / (farm.settings.yield / 100))} kg vivos com
+              rendimento de {decimal(farm.settings.yield)}%. Ganho de peso é uma
+              premissa aproximada, aplicada a todos os animais até o limite de
+              peso do modelo.
+              <a
+                href="https://www.infoteca.cnptia.embrapa.br/infoteca/bitstream/doc/920741/1/500perguntasgadodecorte.pdf"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {" "}
+                Referência da conversão: Embrapa.
+              </a>
+            </p>
+          </details>
           <div className="sandbox-form-actions">
             <button
               className="button primary"
               disabled={!farm.investors.length}
             >
-              <ShoppingCart size={16} />
-              {applied ? "Recalcular teste" : "Calcular teste"}
+              <ArrowUpRight size={17} />
+              {applied ? "Atualizar cenário" : "Simular meu investimento"}
             </button>
             <button
               type="button"
@@ -632,14 +700,18 @@ export default function InvestmentSandbox({ farm }: { farm: Farm }) {
                 </tfoot>
               </table>
             </div>
-            <p className="form-note">
-              Cotas e custo mensal usam os animais cadastrados mais as compras
-              do teste, incluindo a fração dos bois. Sem rebanho, o custo fixo é
-              dividido igualmente. O rateio da compra ajusta os centavos para
-              fechar o total. Aportes futuros consideram custos, receitas
-              projetadas, perdas e reserva; são adicionais ao capital da compra.
-              Pesos não informados deixam a avaliação por arroba incompleta.
-            </p>
+            <details className="sandbox-help">
+              <summary>Como funciona este cálculo</summary>
+              <p className="form-note">
+                Cotas e custo mensal usam os animais cadastrados mais as compras
+                do teste, incluindo a fração dos bois. Sem rebanho, o custo fixo
+                é dividido igualmente. O rateio da compra ajusta os centavos
+                para fechar o total. Aportes futuros consideram custos, receitas
+                projetadas, perdas e reserva; são adicionais ao capital da
+                compra. Pesos não informados deixam a avaliação por arroba
+                incompleta.
+              </p>
+            </details>
           </section>
           <section className="card sandbox-card">
             <div className="sandbox-chart-heading">
@@ -836,30 +908,57 @@ function ReturnForecast({
         RETORNO APROXIMADO · {stage.label}
       </span>
       <h2>Quanto pode voltar para os participantes?</h2>
-      <p>
-        Vendas brutas: <strong>{cash(sales)}</strong> · Distribuído:{" "}
-        <strong>{cash(distributed)}</strong> · Aportes futuros:{" "}
-        <strong>{cash(contributions)}</strong> · Saldo em dinheiro:{" "}
-        <strong>{cash(netCash)}</strong>
-      </p>
-      <p className="form-note">
-        Saldo = distribuições menos compras do teste e novos aportes. O
-        patrimônio atual não é dinheiro recebido. Retorno em caixa sobre capital
-        comprometido:
-        {invested > 0
-          ? " " +
-            decimal(
-              ((distributed - contributions - purchase) / invested) * 100,
-              2,
-            ) +
-            "%"
-          : " sem base de capital"}
-        . A base inclui o valor estimado do rebanho atual, compras e aportes;
-        não inclui a venda do estoque final. A parcela retida paga custos e
-        reservas da fazenda, não é lucro distribuído. Pesos ausentes prejudicam
-        a avaliação inicial e o prazo de venda. Impostos e taxas não estão
-        incluídos.
-      </p>
+      <div className="sandbox-return-metrics">
+        {[
+          {
+            label: "Vendas brutas",
+            value: sales,
+            note: "Receita total no período",
+          },
+          {
+            label: "Recebido pelos participantes",
+            value: distributed,
+            note: "Após a retenção para o caixa",
+          },
+          {
+            label: "Aportes futuros",
+            value: contributions,
+            note: "Para sustentar a operação",
+          },
+          {
+            label: "Saldo em dinheiro",
+            value: netCash,
+            note: "Recebido menos compras e aportes",
+          },
+        ].map((metric, i) => (
+          <div key={metric.label} className={i === 3 ? "is-highlight" : ""}>
+            <span>{metric.label}</span>
+            <strong>{cash(metric.value)}</strong>
+            <small>{metric.note}</small>
+          </div>
+        ))}
+      </div>
+      <details className="sandbox-help">
+        <summary>Como interpretar o retorno</summary>
+        <p className="form-note">
+          Saldo = distribuições menos compras do teste e novos aportes. O
+          patrimônio atual não é dinheiro recebido. Retorno em caixa sobre
+          capital comprometido:
+          {invested > 0
+            ? " " +
+              decimal(
+                ((distributed - contributions - purchase) / invested) * 100,
+                2,
+              ) +
+              "%"
+            : " sem base de capital"}
+          . A base inclui o valor estimado do rebanho atual, compras e aportes;
+          não inclui a venda do estoque final. A parcela retida paga custos e
+          reservas da fazenda, não é lucro distribuído. Pesos ausentes
+          prejudicam a avaliação inicial e o prazo de venda. Impostos e taxas
+          não estão incluídos.
+        </p>
+      </details>
       <div className="table-scroll">
         <table>
           <thead>
@@ -897,12 +996,15 @@ function ReturnForecast({
           </tbody>
         </table>
       </div>
-      <p className="form-note">
-        Valores esperados podem ter cabeças fracionárias por natalidade e
-        mortalidade probabilísticas. O primeiro ano futuro representa os
-        próximos 12 meses a partir do cálculo. Use o filtro de participante
-        acima para ver seu retorno.
-      </p>
+      <details className="sandbox-help">
+        <summary>Como funciona este cálculo</summary>
+        <p className="form-note">
+          Valores esperados podem ter cabeças fracionárias por natalidade e
+          mortalidade probabilísticas. O primeiro ano futuro representa os
+          próximos 12 meses a partir do cálculo. Use o filtro de participante
+          acima para ver seu retorno.
+        </p>
+      </details>
     </section>
   );
 }
@@ -927,14 +1029,34 @@ function PurchaseLot({
   const minimumKg = row.breedingWeightKg ?? 15000 / yieldPercent;
   const ready = (row.weight ?? 0) >= minimumKg;
   return (
-    <div className="card sandbox-card">
-      <div className="sandbox-chart-heading">
-        <h3>Lote {index + 1} · Fêmeas para reprodução</h3>
-        <button type="button" className="button secondary" onClick={remove}>
-          Remover lote {index + 1}
+    <div className="sandbox-lot">
+      <div className="sandbox-lot-heading">
+        <div className="sandbox-lot-title">
+          <span className="sandbox-lot-number">
+            {String(index + 1).padStart(2, "0")}
+          </span>
+          <h3>Lote de fêmeas</h3>
+        </div>
+        <span
+          className={`sandbox-lot-status ${row.pregnant || ready ? "is-ready" : ""}`}
+        >
+          {row.pregnant
+            ? "Prenhas"
+            : ready
+              ? "Aptas pelo peso"
+              : "Em crescimento"}
+        </span>
+        <button
+          type="button"
+          className="sandbox-remove-lot"
+          onClick={remove}
+          aria-label={`Remover lote ${index + 1}`}
+          title="Remover lote"
+        >
+          <Trash2 size={16} />
         </button>
       </div>
-      <div className="sandbox-form-grid">
+      <div className="sandbox-form-grid sandbox-lot-grid">
         <label className="field">
           <span>Quantidade de fêmeas</span>
           <input
@@ -964,8 +1086,15 @@ function PurchaseLot({
             }
           />
         </label>
+        <WeightField
+          initialKg={row.weight}
+          initialUnit="arroba-carcaca"
+          required={row.quantity > 0}
+          yieldPercent={yieldPercent}
+          onWeightChange={onWeight}
+        />
         <label className="field">
-          <span>Idade aproximada na compra (meses)</span>
+          <span>Idade na compra (meses)</span>
           <input
             type="number"
             min="1"
@@ -978,15 +1107,8 @@ function PurchaseLot({
             }
           />
         </label>
-        <WeightField
-          initialKg={row.weight}
-          initialUnit="arroba-carcaca"
-          required={row.quantity > 0}
-          yieldPercent={yieldPercent}
-          onWeightChange={onWeight}
-        />
         <label className="field">
-          <span>Iniciar reprodução com (@ de carcaça)</span>
+          <span>Reprodução a partir de (@ carcaça)</span>
           <input
             type="number"
             min=".1"
@@ -1021,14 +1143,19 @@ function PurchaseLot({
           </span>
         </label>
       </div>
-      <p>
-        <strong>{cash(row.quantity * row.unitPrice)}</strong> ·{" "}
-        {row.pregnant
-          ? "Prenhez informada"
-          : ready
-            ? "Já atingiu o peso informado para iniciar a reprodução"
-            : "Vai crescer até o peso informado antes de iniciar a reprodução"}
-      </p>
+      <div className="sandbox-lot-footer">
+        <span>
+          {row.pregnant
+            ? "Gestação informada na compra"
+            : ready
+              ? "Pode iniciar a reprodução no cenário"
+              : "Cresce até atingir o peso de reprodução"}
+        </span>
+        <div>
+          <small>Total do lote</small>
+          <strong>{cash(row.quantity * row.unitPrice)}</strong>
+        </div>
+      </div>
     </div>
   );
 }
