@@ -8,7 +8,7 @@
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test lib/*.test.ts",
-    "sheets:init": "node --env-file=.env.local --experimental-strip-types scripts/init-sheets.ts"
+    "sheets:init": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --experimental-strip-types scripts/init-sheets.ts"
   },
   "dependencies": {
     "next": "16.2.4",

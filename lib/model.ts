@@ -422,11 +422,11 @@ export const defaultSettings: Settings = {
   saleMonths: 30,
   cullMonths: 120,
   capacity: 120,
-  monthlyPerHead: 85,
-  fixedMonthly: 1800,
+  monthlyPerHead: 0,
+  fixedMonthly: 0,
   inflation: 5,
   reserveMonths: 6,
-  openingCash: 42000,
+  openingCash: 0,
   femaleRetention: 90,
 };
 export function demoFarm(): Farm {
@@ -477,7 +477,12 @@ export function demoFarm(): Farm {
   return {
     animals,
     investors,
-    settings: { ...defaultSettings },
+    settings: {
+      ...defaultSettings,
+      monthlyPerHead: 85,
+      fixedMonthly: 1800,
+      openingCash: 42000,
+    },
     transactions: [
       {
         id: "t1",
