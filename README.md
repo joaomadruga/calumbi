@@ -50,7 +50,7 @@ O inicializador cria apenas abas ausentes e cabeçalhos de abas vazias; não apa
 
 | Aba             | Colunas                                                                                       |
 | --------------- | --------------------------------------------------------------------------------------------- |
-| `Animais`       | `id`, `tag`, `sex`, `born`, `weight`, `owner`, `_reserved` (coluna antiga, sem uso), `status` |
+| `Animais`       | `id`, `tag`, `sex`, `born`, `weight`, `owner`, `_reserved` (metadados JSON), `status` |
 | `Participantes` | `id`, `name`, `color`                                                                         |
 | `Lancamentos`   | `id`, `date`, `kind`, `category`, `description`, `amount`, `investor`                         |
 | `Configuracoes` | `chave`, `valor`                                                                              |
@@ -106,3 +106,7 @@ A integração Google está implementada, mas depende das credenciais e da plani
 - `lib/sheets.ts`: autenticação Google, leitura, gravação e inicialização.
 - `app/api/`: API protegida e sessão.
 - `lib/model.test.ts`: testes de invariantes do modelo financeiro e do rebanho.
+
+Idade e compra são informações separadas. No cadastro, compra e edição, selecione nascimento conhecido ou idade aproximada em meses na data da avaliação. A opção de sugestão por peso é uma interpolação ilustrativa de referências de crescimento Nelore (30 kg ao nascer; 181,30 / 244,51 / 327,54 kg aos 205 / 365 / 550 dias). Referências: https://old.cnpgc.embrapa.br/publicacoes/doc/doc95/04medidas.html e https://www.alice.cnptia.embrapa.br/handle/doc/325931. Não é uma curva validada para Calumbi nem determina idade individual; alimentação, sexo, genética e manejo alteram o peso. Fora de 30–327,54 kg, informe a idade aproximada pelo histórico do vendedor ou avaliação do animal. A data aproximada é persistida para envelhecer com o calendário e alimentar as projeções, sem recalcular a idade a cada nova pesagem.
+
+Os metadados de idade, data de entrada e situação reprodutiva ficam em JSON na coluna G já reservada da aba Animais. As demais colunas e dados antigos são preservados; não precisa rodar o seed. Registros antigos não são reinterpretados automaticamente: corrija pelo botão Editar se o nascimento salvo era a compra. Prenhez confirmada conta uma cria esperada por fêmea no próximo ciclo anual; depois volta à taxa de natalidade e idades configuradas. O modelo aplica a mortalidade de bezerros e não prevê data de parto nem perdas gestacionais específicas. Inseminação sem confirmação não garante nascimento.

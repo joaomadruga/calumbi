@@ -1,3 +1,4 @@
+import { birthFromAge } from "./animal-age.ts";
 import {
   type Farm,
   type Animal,
@@ -116,7 +117,9 @@ export function validateAction(input: unknown, f: Farm): Action {
     if (
       !previous ||
       typeof previous !== "object" ||
-      keys.some((k) => (previous as Animal)[k] !== current[k])
+      keys.some((k) => (previous as Animal)[k] !== current[k]) ||
+      JSON.stringify((previous as Animal)?.details ?? null) !==
+        JSON.stringify(current.details ?? null)
     )
       return fail("O animal foi alterado. Atualize os dados antes de editar.");
     if (data.owner !== current.owner)
@@ -142,7 +145,7 @@ export function validateAction(input: unknown, f: Farm): Action {
         animalId: current.id,
         fromOwner: current.owner,
         toOwner: current.owner,
-        note: `Edição: brinco ${current.tag || "não informado"} → ${updated.tag || "não informado"}; sexo ${current.sex} → ${updated.sex}; nascimento ${current.born} → ${updated.born}; peso vivo ${current.weight} → ${updated.weight} kg`,
+        note: `Edição: brinco ${current.tag || "não informado"} → ${updated.tag || "não informado"}; sexo ${current.sex} → ${updated.sex}; nascimento ${current.born} → ${updated.born}; peso vivo ${current.weight} → ${updated.weight} kg; idade ${updated.details?.birthSource ?? "known"}; entrada ${updated.details?.acquiredAt ?? "não informada"}; reprodução ${updated.details?.reproductiveStatus ?? "unknown"}`,
       },
     };
   }
@@ -187,6 +190,68 @@ export function validateAction(input: unknown, f: Farm): Action {
       owner: text(info.owner, "Participante"),
       status: "ativo",
     };
+    const detailsInput =
+      info.details && typeof info.details === "object"
+        ? (info.details as Record<string, unknown>)
+        : info;
+    if (detailsInput.birthSource !== undefined) {
+      const source = detailsInput.birthSource;
+      if (!["known", "estimated", "weight"].includes(String(source)))
+        return fail("Origem da idade inválida.");
+      const reproductiveStatus = detailsInput.reproductiveStatus ?? "unknown";
+      if (
+        !["unknown", "pregnant", "inseminated", "not-pregnant"].includes(
+          String(reproductiveStatus),
+        )
+      )
+        return fail("Situação reprodutiva inválida.");
+      if (a.sex === "M" && reproductiveStatus !== "unknown")
+        return fail("Situação reprodutiva é exclusiva de fêmeas.");
+      a.details = {
+        birthSource: source as "known" | "estimated" | "weight",
+        reproductiveStatus: reproductiveStatus as NonNullable<
+          Animal["details"]
+        >["reproductiveStatus"],
+      };
+      if (source !== "known") {
+        const months = number(
+          Number(detailsInput.estimatedMonths),
+          "Idade aproximada",
+          0,
+          360,
+        );
+        if (
+          detailsInput.estimatedMonths === "" ||
+          detailsInput.estimatedMonths === undefined ||
+          !Number.isInteger(months)
+        )
+          return fail("Informe a idade aproximada em meses inteiros.");
+        const reference = date(detailsInput.ageReferenceDate);
+        if (reference > new Date().toISOString().slice(0, 10))
+          return fail("Data da avaliação não pode estar no futuro.");
+        a.born = birthFromAge(months, reference);
+        a.details.estimatedMonths = months;
+        a.details.ageReferenceDate = reference;
+        if (source === "weight")
+          a.details.ageWeightKg = number(
+            Number(detailsInput.ageWeightKg),
+            "Peso na estimativa",
+            30,
+            327.54,
+          );
+      }
+      const acquiredAt =
+        type === "purchase" ? data.date : detailsInput.acquiredAt;
+      if (acquiredAt) {
+        const entryDate = date(acquiredAt);
+        if (
+          entryDate < a.born ||
+          entryDate > new Date().toISOString().slice(0, 10)
+        )
+          return fail("Data de entrada deve estar entre o nascimento e hoje.");
+        a.details.acquiredAt = entryDate;
+      }
+    }
     if (new Date(a.born) > new Date())
       return fail("Nascimento não pode estar no futuro.");
     if (

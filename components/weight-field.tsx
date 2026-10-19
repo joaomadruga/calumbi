@@ -1,12 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { weightInKg, weightLabel, type WeightUnit } from "@/lib/weight";
 export default function WeightField({
   initialKg = 0,
   yieldPercent,
+  onWeightChange,
 }: {
   initialKg?: number;
   yieldPercent: number;
+  onWeightChange?: (kg: number) => void;
 }) {
   const [value, setValue] = useState(initialKg ? String(initialKg) : "");
   const [unit, setUnit] = useState<WeightUnit>("kg");
@@ -14,6 +16,9 @@ export default function WeightField({
     value && Number.isFinite(Number(value)) && Number(value) > 0
       ? weightInKg(Number(value), unit, yieldPercent)
       : 0;
+  useEffect(() => {
+    onWeightChange?.(kg);
+  }, [kg, onWeightChange]);
   return (
     <label className="field">
       <span>Peso por animal (opcional)</span>

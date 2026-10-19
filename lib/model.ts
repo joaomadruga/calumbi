@@ -6,6 +6,14 @@ export type Animal = {
   weight: number;
   owner: string;
   status: "ativo" | "vendido" | "morto";
+  details?: {
+    birthSource: "known" | "estimated" | "weight";
+    estimatedMonths?: number;
+    ageReferenceDate?: string;
+    ageWeightKg?: number;
+    acquiredAt?: string;
+    reproductiveStatus: "unknown" | "pregnant" | "inseminated" | "not-pregnant";
+  };
 };
 export type Movement = {
   id: string;
@@ -174,6 +182,7 @@ export function projectOwnership(
     count: number;
     weight: number;
     owner: string;
+    pregnant?: boolean;
   };
   let cohorts: Cohort[] = active(f).map((a) => ({
     id: a.id,
@@ -185,6 +194,7 @@ export function projectOwnership(
     count: 1,
     weight: a.weight,
     owner: a.owner,
+    pregnant: a.details?.reproductiveStatus === "pregnant",
   }));
   const cohortsByYear: Record<number, ProjectedCohort[]> = {};
   const saveCohorts = (year: number) => {
@@ -268,9 +278,12 @@ export function projectOwnership(
     const losses: Record<string, number> = Object.fromEntries(
       owners.map((owner) => [owner, 0]),
     );
-    for (const c of cohorts)
-      if (c.sex === "F" && c.age >= s.maturityMonths && c.age < s.cullMonths)
+    for (const c of cohorts) {
+      if (c.sex !== "F") continue;
+      if (y === 1 && c.pregnant) rows[c.owner].births += c.count;
+      else if (c.age >= s.maturityMonths && c.age < s.cullMonths)
         rows[c.owner].births += (c.count * s.birthRate) / 100;
+    }
     cohorts = cohorts.map((c) => {
       const died =
         (c.count * (c.age < 12 ? s.calfMortality : s.mortality)) / 100;

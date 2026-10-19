@@ -111,6 +111,17 @@ export const headers = {
     "note",
   ],
 };
+export function readAnimalDetails(value: unknown): Animal["details"] {
+  if (typeof value !== "string" || !value.startsWith("{")) return undefined;
+  try {
+    const data = JSON.parse(value);
+    if (!["known", "estimated", "weight"].includes(data.birthSource))
+      return undefined;
+    return data;
+  } catch {
+    return undefined;
+  }
+}
 export async function readFarm(): Promise<Farm> {
   const ranges = [
     "Animais!A1:H10001",
@@ -143,9 +154,12 @@ export async function readFarm(): Promise<Farm> {
     }
   }
   return {
-    animals: objects(0, headers.Animais).map((a) => ({
+    animals: objects(0, headers.Animais).map(({ _reserved, ...a }) => ({
       ...a,
       weight: Number(a.weight),
+      ...(readAnimalDetails(_reserved)
+        ? { details: readAnimalDetails(_reserved) }
+        : {}),
     })) as Animal[],
     investors: objects(1, headers.Participantes) as Investor[],
     transactions: objects(2, headers.Lancamentos).map((t) => ({
@@ -200,7 +214,11 @@ export function buildWriteRequests(
         sheetId: ids[tab],
         rows: [
           cells(
-            headers[tab].map((k) => record[k as keyof typeof record] ?? ""),
+            headers[tab].map((k) =>
+              k === "_reserved"
+                ? JSON.stringify((record as Animal).details ?? null)
+                : (record[k as keyof typeof record] ?? ""),
+            ),
           ),
         ],
         fields: "userEnteredValue",
@@ -227,13 +245,22 @@ export function buildWriteRequests(
         (k, i) =>
           (k === "weight" ? Number(row[i] || 0) : String(row[i] ?? "")) !==
           a.previous[k],
-      )
+      ) ||
+      JSON.stringify(readAnimalDetails(row?.[6]) ?? null) !==
+        JSON.stringify(a.previous.details ?? null)
     )
       throw new Error("O animal foi alterado. Atualize os dados.");
     requests.push({
       updateCells: {
         start: { sheetId: ids.Animais, rowIndex: index, columnIndex: 1 },
         rows: [cells([a.data.tag, a.data.sex, a.data.born, a.data.weight])],
+        fields: "userEnteredValue",
+      },
+    });
+    requests.push({
+      updateCells: {
+        start: { sheetId: ids.Animais, rowIndex: index, columnIndex: 6 },
+        rows: [cells([JSON.stringify(a.data.details ?? null)])],
         fields: "userEnteredValue",
       },
     });

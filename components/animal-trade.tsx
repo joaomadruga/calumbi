@@ -17,7 +17,7 @@ import {
   money,
 } from "@/lib/model";
 
-import WeightField from "./weight-field";
+import AnimalBioFields from "./animal-bio-fields";
 import { weightLabel } from "@/lib/weight";
 type Props = {
   farm: Farm;
@@ -112,11 +112,10 @@ export default function AnimalTrade({
                 <option value="M">Macho</option>
               </select>
             </label>
-            <label className="field">
-              <span>Nascimento</span>
-              <input name="born" type="date" max={today()} required />
-            </label>
-            <WeightField yieldPercent={farm.settings.yield} />
+            <AnimalBioFields
+              yieldPercent={farm.settings.yield}
+              showArrival={false}
+            />
             <label className="field">
               <span>Proprietário do animal</span>
               <select name="owner" required defaultValue="">

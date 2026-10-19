@@ -1,6 +1,6 @@
 "use client";
 import type { Animal, Farm } from "@/lib/model";
-import WeightField from "./weight-field";
+import AnimalBioFields from "./animal-bio-fields";
 export default function AnimalEditor({
   animal,
   farm,
@@ -41,20 +41,7 @@ export default function AnimalEditor({
             <option value="M">Macho</option>
           </select>
         </label>
-        <label className="field">
-          <span>Nascimento</span>
-          <input
-            name="born"
-            type="date"
-            defaultValue={animal.born}
-            max={new Date().toISOString().slice(0, 10)}
-            required
-          />
-        </label>
-        <WeightField
-          initialKg={animal.weight}
-          yieldPercent={farm.settings.yield}
-        />
+        <AnimalBioFields animal={animal} yieldPercent={farm.settings.yield} />
       </div>
       <p className="form-note">
         ID permanente: {animal.id}. Proprietário:{" "}

@@ -62,7 +62,7 @@ import {
   animalValue,
 } from "@/lib/model";
 import { applyAction, validateAction } from "@/lib/actions";
-import WeightField from "./weight-field";
+import AnimalBioFields from "./animal-bio-fields";
 import AnimalEditor from "./animal-editor";
 import { weightLabel } from "@/lib/weight";
 import FarmMap from "./farm-map";
@@ -1050,6 +1050,10 @@ export default function Dashboard({
                                   </td>
                                   <td>{category(a)}</td>
                                   <td>
+                                    {a.details?.birthSource &&
+                                    a.details.birthSource !== "known"
+                                      ? "≈ "
+                                      : ""}
                                     {ageMonths(a.born)} meses{" "}
                                     <span className="muted">
                                       /{" "}
@@ -1992,10 +1996,7 @@ export default function Dashboard({
                       <option value="M">Macho</option>
                     </select>
                   </Field>
-                  <Field label="Nascimento">
-                    <input name="born" type="date" max={today()} required />
-                  </Field>
-                  <WeightField yieldPercent={farm?.settings.yield ?? 50} />
+                  <AnimalBioFields yieldPercent={farm?.settings.yield ?? 50} />
                   <Field label="Participante">
                     <select name="owner" required>
                       <option value="">Selecione</option>
@@ -2113,11 +2114,55 @@ export default function Dashboard({
                       </dd>
                     </div>
                     <div>
-                      <dt>Nascimento</dt>
+                      <dt>
+                        {selectedAnimal.details?.birthSource &&
+                        selectedAnimal.details.birthSource !== "known"
+                          ? "Nascimento estimado"
+                          : "Nascimento informado"}
+                      </dt>
                       <dd>
                         {new Date(
                           selectedAnimal.born + "T12:00:00",
                         ).toLocaleDateString("pt-BR")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Idade</dt>
+                      <dd>
+                        {selectedAnimal.details?.birthSource &&
+                        selectedAnimal.details.birthSource !== "known"
+                          ? "Aproximadamente "
+                          : ""}
+                        {ageMonths(selectedAnimal.born)} meses
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Compra / entrada</dt>
+                      <dd>
+                        {selectedAnimal.details?.acquiredAt ??
+                          farm.movements?.find(
+                            (m) =>
+                              m.animalId === selectedAnimal.id &&
+                              m.kind === "compra",
+                          )?.date ??
+                          "Não informada"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Situação reprodutiva</dt>
+                      <dd>
+                        {
+                          {
+                            unknown: "Não informada",
+                            pregnant: "Prenhez confirmada",
+                            inseminated:
+                              "Inseminada / coberta, sem confirmação",
+                            "not-pregnant": "Não prenhe",
+                          }[
+                            selectedAnimal.details?.reproductiveStatus ??
+                              "unknown"
+                          ]
+                        }
                       </dd>
                     </div>
                     <div>
